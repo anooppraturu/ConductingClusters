@@ -1,0 +1,35 @@
+Since I finally got my shit together and put everything on Github, I figured I
+should make a TODO list that all of us will have access to. This way we will
+all be on the same page about what needs to get done.
+
+1) Join-VTK for dye
+   Got the dye initial conditions as well as z=0 plane outputs set up to track
+   mixing in the sims. It runs on stampede with multiple processors and,
+   however when I join the vtk files only half of the domain is joined, the
+   other half is set to 0! In some cases it even combines the dye from
+   different shells.
+
+2) Make the Code Restartable
+   In the process of adding the in situ radial profile calculations the code no
+   longer worked with restarts; it gave a segfault. My best guess is that I
+   didn't re-calloc the arrays in the read-restart function. Since I have since
+   added dye to the sims and they will no doubt require me to add something to
+   the read restart, I should probably wait until 1) is resolved and then deal
+   with all of this restart business together.
+
+3) Splashback
+   NFW doesn't really work past the virial radius (We were fortunate enought to
+   discuss this in person with Benedikt Diemer). The biggest challenge is that
+   we are using accretion rates from Mcbride et al (Millenium) calibrated for
+   Mvir, but all of this business about the outer profiles of halos is most
+   naturally though about in terms of the splashback radius. At this stage the
+   best thing to do would probably be to read a shitload of Ben's papers.
+   
+4) Noisy B-Field
+   Concentric loops that we currently have implemented are not realistic. Fix
+   shouldn't be too hard though. I believe Mike already has a noisy field
+   implemented for the velocity. Simply take the curl of that to ensure that it
+   solves Maxwell's equations.
+
+
+Last updated June 28th 2017
