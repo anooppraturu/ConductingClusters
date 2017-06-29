@@ -30,6 +30,10 @@ all be on the same page about what needs to get done.
    shouldn't be too hard though. I believe Mike already has a noisy field
    implemented for the velocity. Simply take the curl of that to ensure that it
    solves Maxwell's equations.
+   Update: did a lot of copying and pasting code form Jim Stone's turb.c to get
+   noise in the magnetic field. The only thing left (I believe) is to call the
+   various functions in the right order in the problem function in order to
+   actually perturb the field. Should be really quick but the day is winding
+   down and I have something to go to so I'm gonna push this off. Sorry!
 
-
-Last updated June 28th 2017
+Last updated June 29th 2017
