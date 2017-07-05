@@ -23,7 +23,7 @@ all be on the same page about what needs to get done.
    we are using accretion rates from Mcbride et al (Millenium) calibrated for
    Mvir, but all of this business about the outer profiles of halos is most
    naturally though about in terms of the splashback radius. At this stage the
-   best thing to do would probably be to read a shitload of Ben's papers.
+   best thing to do would probably be to read a ton of Ben's papers.
    
 4) Noisy B-Field
    Concentric loops that we currently have implemented are not realistic. Fix
