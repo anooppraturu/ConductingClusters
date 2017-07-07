@@ -105,7 +105,7 @@ void problem(DomainS *pDomain)
   int is,ie,js,je,ks,ke,iprob;
   int il,iu,jl,ju,kl,ku;
   Real x1,x2,x3, r;
-  Real x1m, x2m, x3m;
+  Real x1m;
   Real rho, P, v, KE, phi;
   Real rhoi, rhoshock, Pshock, phishock, rshock, fact;
 
@@ -201,7 +201,7 @@ void problem(DomainS *pDomain)
         pGrid->U[k][j][i].M3 = -1.0 * rho * v * x3/r;
 
 #if (NSCALARS > 0)
-        cc_pos(pGrid,ie,je,ke,&x1m,&x2m,&x3m);
+        x1m = pDomain->RootMaxX[0];
         halfwidth = x1m/(2.0*(float)NSCALARS);
 
         for(n=0; n<NSCALARS; n++){
