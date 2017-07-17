@@ -365,6 +365,10 @@ int main(int argc, char *argv[])
   four_pi_G = -1.0;
 #endif
 
+  /* moved from definition below -- MAY BE A DANGEROUS HACK!! */
+  /* in particular, THIS WILL BREAK CUSTOM BCs DEFINED IN PROBLEM() */
+  bvals_mhd_init(&Mesh);
+
   if(ires) {
     restart_grids(res_file, &Mesh);  /*  Restart */
     nstep_start = Mesh.nstep;
@@ -390,7 +394,7 @@ int main(int argc, char *argv[])
  * set boundary conditions for initial conditions.  With SMR, this includes
  * a prolongation step to set ghost zones at internal fine/coarse boundaries  */
 
-  bvals_mhd_init(&Mesh);
+/*   bvals_mhd_init(&Mesh);	/\* moved to before problem() -- MAY BE A DANGEROUS HACK!! *\/ */
 
 #ifdef SELF_GRAVITY
   bvals_grav_init(&Mesh);

@@ -280,6 +280,82 @@ static void perturb(DomainS *pDomain)
     }
   }
  
+#ifdef MPI_PARALLEL
+  /* need to populate ghost zones... */
+  /* ... copy to A B*c as a hack so that we can use the built-in
+     bvals_mhd() to handle interprocessor communication.  */
+
+  /* copy A* to B*c */
+  for (k=ks; k<=ke; k++) {
+    for (j=js; j<=je; j++) {
+      for (i=is; i<=ie; i++) {
+        pGrid->U[k][j][i].B1c = A1[k][j][i];
+        pGrid->U[k][j][i].B2c = A2[k][j][i];
+        pGrid->U[k][j][i].B3c = A3[k][j][i];
+      }
+    }
+  }
+
+  /* bvals_mhd() for communication */
+  bvals_mhd(pDomain);
+
+  /* copy B*c to the ghost-zones of A* */
+
+  /* x1 direction */
+  for (k=ks; k<=ke; k++) {
+    for (j=js; j<=je; j++) {
+      for (i=1; i<=nghost; i++) {
+	      A1[k][j][is-i] = pGrid->U[k][j][is-i].B1c;
+	      A1[k][j][ie+i] = pGrid->U[k][j][ie+i].B1c;
+
+	      A2[k][j][is-i] = pGrid->U[k][j][is-i].B2c;
+	      A2[k][j][ie+i] = pGrid->U[k][j][ie+i].B2c;
+
+	      A3[k][j][is-i] = pGrid->U[k][j][is-i].B3c;
+	      A3[k][j][ie+i] = pGrid->U[k][j][ie+i].B3c;
+      }
+    }
+  }
+
+  /* x2 direction */
+  if (pGrid->Nx[1] > 1){
+    for (k=ks; k<=ke; k++) {
+      for (j=1; j<=nghost; j++) {
+	      for (i=is-nghost; i<=ie+nghost; i++) {
+	         A1[k][js-j][i] = pGrid->U[k][js-j][i].B1c;
+	         A1[k][je+j][i] = pGrid->U[k][je+j][i].B1c;
+
+	         A2[k][js-j][i] = pGrid->U[k][js-j][i].B2c;
+	         A2[k][je+j][i] = pGrid->U[k][je+j][i].B2c;
+	  
+            A3[k][js-j][i] = pGrid->U[k][js-j][i].B3c;
+	         A3[k][je+j][i] = pGrid->U[k][je+j][i].B3c;
+	      }
+      }
+    }
+  }
+
+  /* x3 direction */
+  if (pGrid->Nx[2] > 1){
+    for (k=1; k<=nghost; k++) {
+      for (j=js-nghost; j<=je+nghost; j++) {
+         for (i=is-nghost; i<=ie+nghost; i++) {
+           A1[ks-k][j][i] = pGrid->U[ks-k][j][i].B1c;
+           A1[ke+k][j][i] = pGrid->U[ke+k][j][i].B1c;
+
+           A2[ks-k][j][i] = pGrid->U[ks-k][j][i].B2c;
+           A2[ks-k][j][i] = pGrid->U[ks-k][j][i].B2c;
+           
+           A3[ke+k][j][i] = pGrid->U[ke+k][j][i].B3c;
+           A3[ke+k][j][i] = pGrid->U[ke+k][j][i].B3c;
+         }
+      }
+    }
+  }
+
+  /* phew! */
+#endif /*MPI_PARALLEL*/
+    
   for (k=ks; k<=ke; k++) {
     for (j=js; j<=je; j++) {
       for (i=is; i<=ie+1; i++) {
