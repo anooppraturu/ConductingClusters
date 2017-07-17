@@ -93,6 +93,8 @@ ifeq ($(MACHINE),macosx)
   CC = gcc
   LDR = gcc
   OPT = -O3 
+  MPIINC = -I/usr/local/include
+  MPILIB = -L/usr/local/lib -lmpi
   FFTWLIB = -L/usr/local/lib -lfftw3
   FFTWINC = -I/usr/local/include -I/usr/include/malloc/
 else
