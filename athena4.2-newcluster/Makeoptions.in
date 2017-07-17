@@ -93,8 +93,8 @@ ifeq ($(MACHINE),macosx)
   CC = gcc
   LDR = gcc
   OPT = -O3 
-  FFTWLIB = -L/opt/local/lib -lfftw3
-  FFTWINC = -I/opt/local/include
+  FFTWLIB = -L/usr/local/lib -lfftw3
+  FFTWINC = -I/usr/local/include -I/usr/include/malloc/
 else
   abort Unsupported MACHINE=$(MACHINE)
 endif
