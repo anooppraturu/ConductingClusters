@@ -11,6 +11,14 @@
 
 #include "prob/math_functions.h"
 
+#ifdef MPI_PARALLEL
+#include "mpi.h"
+#ifdef DOUBLE_PREC
+#define MPI_RL MPI_DOUBLE
+#else /* DOUBLE_PREC */
+#define MPI_RL MPI_FLOAT
+#endif /* DOUBLE_PREC */
+#endif /* MPI_PARALLEL */
 
 /* ========================================================================== */
 /* Prototypes and Definitions */
@@ -89,6 +97,46 @@ static Real **profile_data_global;
 static void calc_profiles(DomainS *pDomain, Real **profile_data);
 
 
+/* FFT prototypes */
+/* ------------------------------------------------------------------------ */
+
+/* FFT indexing Nfast=k, Nmid=j, Nslow=i (opposite to Athena)
+ * For OFST, i,j,k,nx2,nx3 reference the local grid */
+#define OFST(i, j, k) ((k) + nx3*((j) + nx2*(i)))
+/* KWVM: magnitude of wavenumber k in units of dkx */
+#define KWVM(i, j, k) (sqrt(SQR(KCOMP(i,gis-nghost,gnx1))+ \
+                            SQR(KCOMP(j,gjs-nghost,gnx2))+ \
+                            SQR(KCOMP(k,gks-nghost,gnx3))))
+
+/* FFTW - Variables, Plan, etc. */
+static struct ath_3d_fft_plan *plan;
+
+static ath_fft_data *fA1=NULL, *fA2=NULL, *fA3=NULL;
+static Real ***A1=NULL, ***A2=NULL, ***A3=NULL;
+
+/* Cutoff wavenumbers, G&O spect peak, power law spect exponent, 2 pi/L */
+static Real klow,khigh,expo,dkx;
+/* Number of cells in local grid, number of cells in global grid */
+static int nx1,nx2,nx3,gnx1,gnx2,gnx3;
+/* Starting and ending indices for global grid */
+static int gis,gie,gjs,gje,gks,gke;
+/* Seed for random number generator */
+long int rseed;
+
+/* Functions appear in this file in the same order that they appear in the
+ * prototypes below */
+
+/* Function prototypes for generating velocity perturbations */
+static void pspect(ath_fft_data *ampl);
+static inline void transform();
+static inline void generate();
+static void perturb(DomainS *pDomain);
+
+/* Function prototypes for initializing and interfacing with Athena */
+static void initialize(GridS *pGrid, DomainS *pD);
+
+/* Function prototypes for Numerical Recipes functions */
+static double ran2(long int *idum);
 
 
 
@@ -97,6 +145,237 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data);
 
 
 /* ========================================================================== */
+/* Before we get to the problem file, FFT functions for B */
+
+/*  Power spectrum returned in ampl
+ *  - klow   = multiple of 2 pi/L for cut-off at low  wavenumbers
+ *  - khigh  = multiple of 2 pi/L for cut-off at high wavenumbers
+ *  - expo   = exponent of power law
+ *  - ispect = integer flag which specifies spectrum
+ *
+ *  Note that the fourier amplitudes are stored in an array with no
+ *  ghost zones
+ */
+static void pspect(ath_fft_data *ampl)
+{
+  int i,j,k;
+  double q1,q2,q3;
+
+  /* set random amplitudes with gaussian deviation */
+  for (k=0; k<nx3; k++) {
+    for (j=0; j<nx2; j++) {
+      for (i=0; i<nx1; i++) {
+        q1 = ran2(&rseed);
+        q2 = ran2(&rseed);
+        q3 = sqrt(-2.0*log(q1+1.0e-20))*cos(2.0*PI*q2);
+        q1 = ran2(&rseed);
+        ampl[OFST(i,j,k)][0] = q3*cos(2.0*PI*q1);
+        ampl[OFST(i,j,k)][1] = q3*sin(2.0*PI*q1);
+      }
+    }
+  }
+
+  /* set power spectrum */
+  for (k=0; k<nx3; k++) {
+    for (j=0; j<nx2; j++) {
+      for (i=0; i<nx1; i++) {
+        /* compute k/dkx */
+        q3 = KWVM(i,j,k);
+        if ((q3 > klow) && (q3 < khigh)) { /* decreasing power law */
+          q3 *= dkx; /* multiply by 2 pi/L */
+
+          ampl[OFST(i,j,k)][0] /= pow(q3,(expo+2.0));
+          ampl[OFST(i,j,k)][1] /= pow(q3,(expo+2.0));
+        } else {                /* introduce cut-offs at klow and khigh */
+          ampl[OFST(i,j,k)][0] = 0.0;
+          ampl[OFST(i,j,k)][1] = 0.0;
+        }
+
+      }
+    }
+  }
+  ampl[0][0] = 0.0;
+  ampl[0][1] = 0.0;
+
+  return;
+}
+
+static inline void transform()
+{
+  /* Transform vector potential from k space to physical space */
+  ath_3d_fft(plan, fA1);
+  ath_3d_fft(plan, fA2);
+  ath_3d_fft(plan, fA3);
+
+  /*I think the below is from Jimmy's original turb.c, ignore I guess...*/
+  /* Should technically renormalize (divide by gnx1*gnx2*gnx3) here, but
+   * since we're going to renormalize to get the desired energy injection
+   * rate anyway, there's no point */
+
+  return;
+}
+
+static inline void generate()
+{
+  /* Generate new perturbations following appropriate power spectrum */
+  pspect(fA1);
+  pspect(fA2);
+  pspect(fA3);
+  
+
+  /* Transform perturbations to real space, but don't normalize until
+   * just before we apply them in perturb() */
+  transform();
+
+  return;
+}
+
+static void perturb(DomainS *pDomain)
+{
+  GridS *pGrid = pDomain->Grid;
+  int i, is=pGrid->is, ie = pGrid->ie;
+  int j, js=pGrid->js, je = pGrid->je;
+  int k, ks=pGrid->ks, ke = pGrid->ke, ku;
+  int ind, mpierr;
+  Real rms[2], grms[2];
+
+  for (k=ks; k<=ke; k++) {
+    for (j=js; j<=je; j++) {
+      for (i=is; i<=ie; i++) {
+        ind = OFST(i-is,j-js,k-ks);
+        A1[k][j][i] = fA1[ind][0];
+        A2[k][j][i] = fA2[ind][0];
+        A3[k][j][i] = fA3[ind][0];
+      }
+    }
+  }
+
+  rms[0] = rms[1] = 0.0;
+  for (k=ks; k<=ke; k++) {
+    for (j=js; j<=je; j++) {
+      for (i=is; i<=ie; i++) {
+        rms[0] += SQR(A1[k][j][i]) + SQR(A2[k][j][i]) + SQR(A3[k][j][i]);
+        rms[1] += 1;
+      }
+    }
+  }
+
+#ifdef MPI_PARALLEL
+  mpierr = MPI_Allreduce(rms, grms, 2, MPI_RL, MPI_SUM, MPI_COMM_WORLD);
+  if (mpierr) ath_error("[normalize]: MPI_Allreduce error = %d\n", mpierr);
+  rms[0] = grms[0];
+  rms[1] = grms[1];
+#endif /* MPI_PARALLEL */
+
+  rms[0] = sqrt(rms[0]/rms[1]);
+  //ath_pout(0, "rms = %f\n", rms);
+
+  for (k=ks; k<=ke; k++) {
+    for (j=js; j<=je; j++) {
+      for (i=is; i<=ie; i++) {
+        A1[k][j][i] /= rms[0];
+        A2[k][j][i] /= rms[0];
+        A3[k][j][i] /= rms[0];
+      }
+    }
+  }
+ 
+  for (k=ks; k<=ke; k++) {
+    for (j=js; j<=je; j++) {
+      for (i=is; i<=ie+1; i++) {
+         pGrid->B1i[k][j][i] = (A3[k][j+1][i] - A3[k][j][i])/pGrid->dx2 -
+                          (A2[k+1][j][i] - A2[k][j][i])/pGrid->dx3;
+      }
+    }
+  }
+  for (k=ks; k<=ke; k++) {
+    for (j=js; j<=je+1; j++) {
+      for (i=is; i<=ie; i++) {
+         pGrid->B2i[k][j][i] = (A1[k+1][j][i] - A1[k][j][i])/pGrid->dx3 -
+                          (A3[k][j][i+1] - A3[k][j][i])/pGrid->dx1;
+      }
+    }
+  }
+  if (ke > ks) {
+    ku = ke+1;
+  } else {
+    ku = ke;
+  }
+  for (k=ks; k<=ku; k++) {
+    for (j=js; j<=je; j++) {
+      for (i=is; i<=ie; i++) {
+         pGrid->B3i[k][j][i] = (A2[k][j][i+1] - A2[k][j][i])/pGrid->dx1 -
+                          (A1[k][j+1][i] - A1[k][j][i])/pGrid->dx2;
+      }
+    }
+  }
+  return;
+}
+
+static void initialize(GridS *pGrid, DomainS *pD)
+{
+  int i, is=pGrid->is, ie = pGrid->ie;
+  int j, js=pGrid->js, je = pGrid->je;
+  int k, ks=pGrid->ks, ke = pGrid->ke;
+  int nbuf, mpierr, nx1gh, nx2gh, nx3gh;
+
+/* -----------------------------------------------------------
+ * Variables within this block are stored globally, and used
+ * within preprocessor macros.  Don't create variables with
+ * these names within your function if you are going to use
+ * OFST(), KCOMP(), or KWVM() within the function! */
+
+  /* Get local grid size */
+  nx1 = (ie-is+1);
+  nx2 = (je-js+1);
+  nx3 = (ke-ks+1);
+
+  /* Get global grid size */
+  gnx1 = pD->Nx[0];
+  gnx2 = pD->Nx[1];
+  gnx3 = pD->Nx[2];
+
+  /* Get extents of local FFT grid in global coordinates */
+  gis=is+pGrid->Disp[0];  gie=ie+pGrid->Disp[0];
+  gjs=js+pGrid->Disp[1];  gje=je+pGrid->Disp[1];
+  gks=ks+pGrid->Disp[2];  gke=ke+pGrid->Disp[2];
+/* ----------------------------------------------------------- */
+
+  /* Get size of arrays with ghost cells */
+  nx1gh = nx1 + 2*nghost;
+  nx2gh = nx2 + 2*nghost;
+  nx3gh = nx3 + 2*nghost;
+
+  expo = par_getd("problem","expo");
+
+  /* Cutoff wavenumbers of spectrum */
+  klow = par_getd("problem","klow"); /* in integer units */
+  khigh = par_getd("problem","khigh"); /* in integer units */
+  dkx = 2.0*PI/(pGrid->dx1*gnx1); /* convert k from integer */
+
+  /* Allocate memory for components of vector potential */
+  if ((A1=(Real***)calloc_3d_array(nx3gh,nx2gh,nx1gh,sizeof(Real)))==NULL) {
+    ath_error("[problem]: Error allocating memory for vel pert\n");
+  }
+  if ((A2=(Real***)calloc_3d_array(nx3gh,nx2gh,nx1gh,sizeof(Real)))==NULL) {
+    ath_error("[problem]: Error allocating memory for vel pert\n");
+  }
+  if ((A3=(Real***)calloc_3d_array(nx3gh,nx2gh,nx1gh,sizeof(Real)))==NULL) {
+    ath_error("[problem]: Error allocating memory for vel pert\n");
+  }
+
+
+  /* Initialize the FFT plan */
+  plan = ath_3d_fft_quick_plan(pD, NULL, ATH_FFT_BACKWARD);
+
+  fA1 = ath_3d_fft_malloc(plan);
+  fA2 = ath_3d_fft_malloc(plan);
+  fA3 = ath_3d_fft_malloc(plan);
+
+
+  return;
+}
+
 /* Create the initial condition and start the simulation! */
 void problem(DomainS *pDomain)
 {
@@ -124,6 +403,13 @@ void problem(DomainS *pDomain)
   Real halfwidth;
 #endif
 
+  /* Ensure a different initial random seed for each process in an MPI calc. */
+  rseed = -11;
+#ifdef MPI_PARALLEL
+  rseed -= myID_Comm_world;
+#endif
+  initialize(pGrid, pDomain);
+  
   set_vars(pGrid->time);
 
   /* find the shock and calculate the pre- and post-shock
@@ -218,28 +504,11 @@ void problem(DomainS *pDomain)
 
 
   /* interface magnetic field */
-  il = is;    iu = ie+1;
-  jl = js;    ju = je+1;
-  kl = ks;    ku = (pGrid->Nx[2] > 1) ? ke+1 : ke;
-
-  for (k=kl; k<=ku; k++) {
-    for (j=jl; j<=ju; j++) {
-      for (i=il; i<=iu; i++) {
 #ifdef MHD
-        cc_pos(pGrid,i,j,k,&x1,&x2,&x3);
-        x1 += 0.5 * pGrid->dx1;
-        x2 += 0.5 * pGrid->dx2;
-        x3 += 0.5 * pGrid->dx3;
+  generate();
 
-        r = sqrt(x1*x1+x2*x2+x3*x3) + TINY_NUMBER;
-
-        pGrid->B1i[k][j][i] = -x2/r * 1.0e-4;
-        pGrid->B2i[k][j][i] =  x1/r * 1.0e-4;
-        pGrid->B3i[k][j][i] = 0.0;
+  perturb(pDomain);
 #endif  /* MHD */
-      }
-    }
-  }
 
 
   /* cell-centered magnetic field */
@@ -699,6 +968,15 @@ void problem_read_restart(MeshS *pM, FILE *fp)
   }
 #endif /*MPI_PARALLEL*/
   
+  /* Free Athena-style arrays */
+  free_3d_array(A1);
+  free_3d_array(A2);
+  free_3d_array(A3);
+
+  /* Free FFTW-style arrays */
+  ath_3d_fft_free(fA1);
+  ath_3d_fft_free(fA2);
+  ath_3d_fft_free(fA3);
   return;
 }
 
@@ -1100,6 +1378,9 @@ void Userwork_after_loop(MeshS *pM)
 
   /* free memory if necessary */
   if (profile_data != NULL) free_2d_array((void**) profile_data);
+  if (A1 != NULL) free_3d_array((void***) A1);
+  if (A2 != NULL) free_3d_array((void***) A2);
+  if (A3 != NULL) free_3d_array((void***) A3);
 
 #ifdef MPI_PARALLEL
   if (profile_data_global != NULL) free_2d_array((void**) profile_data_global);
@@ -1107,6 +1388,88 @@ void Userwork_after_loop(MeshS *pM)
 
   return;
 }
+
+
+#define IM1 2147483563
+#define IM2 2147483399
+#define AM (1.0/IM1)
+#define IMM1 (IM1-1)
+#define IA1 40014
+#define IA2 40692
+#define IQ1 53668
+#define IQ2 52774
+#define IR1 12211
+#define IR2 3791
+#define NDIV (1+IMM1/NTAB)
+#define RNMX (1.0-DBL_EPSILON)
+#define NTAB 32
+
+/*! \fn double ran2(long int *idum){
+ *  \brief The routine ran2() is extracted from the Numerical Recipes in C
+ *
+ * The routine ran2() is extracted from the Numerical Recipes in C
+ * (version 2) code.  I've modified it to use doubles instead of
+ * floats. -- T. A. Gardiner -- Aug. 12, 2003
+ *
+ * Long period (> 2 x 10^{18}) random number generator of L'Ecuyer
+ * with Bays-Durham shuffle and added safeguards.  Returns a uniform
+ * random deviate between 0.0 and 1.0 (exclusive of the endpoint
+ * values).  Call with idum = a negative integer to initialize;
+ * thereafter, do not alter idum between successive deviates in a
+ * sequence.  RNMX should appriximate the largest floating point value
+ * that is less than 1. */
+
+double ran2(long int *idum){
+  int j;
+  long int k;
+  static long int idum2=123456789;
+  static long int iy=0;
+  static long int iv[NTAB];
+  double temp;
+
+  if (*idum <= 0) { /* Initialize */
+    if (-(*idum) < 1) *idum=1; /* Be sure to prevent idum = 0 */
+    else *idum = -(*idum);
+    idum2=(*idum);
+    for (j=NTAB+7;j>=0;j--) { /* Load the shuffle table (after 8 warm-ups) */
+      k=(*idum)/IQ1;
+      *idum=IA1*(*idum-k*IQ1)-k*IR1;
+      if (*idum < 0) *idum += IM1;
+      if (j < NTAB) iv[j] = *idum;
+    }
+    iy=iv[0];
+  }
+  k=(*idum)/IQ1;                 /* Start here when not initializing */
+  *idum=IA1*(*idum-k*IQ1)-k*IR1; /* Compute idum=(IA1*idum) % IM1 without */
+  if (*idum < 0) *idum += IM1;   /* overflows by Schrage's method */
+  k=idum2/IQ2;
+  idum2=IA2*(idum2-k*IQ2)-k*IR2; /* Compute idum2=(IA2*idum) % IM2 likewise */
+  if (idum2 < 0) idum2 += IM2;
+  j=(int)(iy/NDIV);              /* Will be in the range 0...NTAB-1 */
+  iy=iv[j]-idum2;                /* Here idum is shuffled, idum and idum2 */
+  iv[j] = *idum;                 /* are combined to generate output */
+  if (iy < 1) iy += IMM1;
+  if ((temp=AM*iy) > RNMX) return RNMX; /* No endpoint values */
+  else return temp;
+}
+
+#undef IM1
+#undef IM2
+#undef AM
+#undef IMM1
+#undef IA1
+#undef IA2
+#undef IQ1
+#undef IQ2
+#undef IR1
+#undef IR2
+#undef NTAB
+#undef NDIV
+#undef RNMX
+
+#undef OFST
+#undef KCOMP
+#undef KWVM
 /* end userwork */
 /* ========================================================================== */
 
