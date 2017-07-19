@@ -237,7 +237,10 @@ static void perturb(DomainS *pDomain)
   int j, js=pGrid->js, je = pGrid->je;
   int k, ks=pGrid->ks, ke = pGrid->ke, ku;
   int ind, mpierr;
+  Real Bstrength;
   Real rms[2], grms[2];
+
+  Bstrength = par_getd("problem", "Bstrength");
 
   for (k=ks; k<=ke; k++) {
     for (j=js; j<=je; j++) {
@@ -273,9 +276,9 @@ static void perturb(DomainS *pDomain)
   for (k=ks; k<=ke; k++) {
     for (j=js; j<=je; j++) {
       for (i=is; i<=ie; i++) {
-        A1[k][j][i] /= rms[0];
-        A2[k][j][i] /= rms[0];
-        A3[k][j][i] /= rms[0];
+        A1[k][j][i] /= pow(10.0,Bstrength)*rms[0];
+        A2[k][j][i] /= pow(10.0,Bstrength)*rms[0];
+        A3[k][j][i] /= pow(10.0,Bstrength)*rms[0];
       }
     }
   }
@@ -321,16 +324,16 @@ static void perturb(DomainS *pDomain)
   if (pGrid->Nx[1] > 1){
     for (k=ks; k<=ke; k++) {
       for (j=1; j<=nghost; j++) {
-	      for (i=is-nghost; i<=ie+nghost; i++) {
-	         A1[k][js-j][i] = pGrid->U[k][js-j][i].B1c;
-	         A1[k][je+j][i] = pGrid->U[k][je+j][i].B1c;
+	 for (i=is-nghost; i<=ie+nghost; i++) {
+	    A1[k][js-j][i] = pGrid->U[k][js-j][i].B1c;
+	    A1[k][je+j][i] = pGrid->U[k][je+j][i].B1c;
 
-	         A2[k][js-j][i] = pGrid->U[k][js-j][i].B2c;
-	         A2[k][je+j][i] = pGrid->U[k][je+j][i].B2c;
+	    A2[k][js-j][i] = pGrid->U[k][js-j][i].B2c;
+	    A2[k][je+j][i] = pGrid->U[k][je+j][i].B2c;
 	  
             A3[k][js-j][i] = pGrid->U[k][js-j][i].B3c;
-	         A3[k][je+j][i] = pGrid->U[k][je+j][i].B3c;
-	      }
+	    A3[k][je+j][i] = pGrid->U[k][je+j][i].B3c;
+	 }
       }
     }
   }
