@@ -87,8 +87,12 @@ void dump_profile(DomainS *pD, OutputS *pOut);
 
 static Real **profile_data;
 static int n_bins;
-/*num, radius, P, rho, T, K, Mach*/
-const int n_profiles = 7;
+/*num, radius, P, rho, T, K, Mach, B^2, beta, Br*/
+const int n_profiles = 7
+#ifdef MHD
+   + 3
+#endif /*MHD*/
+;
 
 #ifdef MPI_PARALLEL
 static Real **profile_data_global;
@@ -1162,7 +1166,7 @@ static void inner_bc(DomainS *pDomain)
 /*Already loop over domains in Userwork_in_loop so I wrote this to only get passed domain, call it within loop in Userwork*/
 static void calc_profiles(DomainS *pDomain, Real **profile_data)
 {
-   int nl, nd, ntot;
+   int nl, nd;
    GridS *pGrid = pDomain->Grid;
    int is, ie, js, je, ks, ke;
    int i, j, k, s;
@@ -1236,7 +1240,17 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
 
             /*Entropy*/
             profile_data[6][s] += W.P / pow(W.d,5.0/3.0);
+#ifdef MHD
+            /*B^2*/
+            profile_data[7][s] += SQR(W.B1c) + SQR(W.B2c) + SQR(W.B3c);
 
+            /*beta*/
+            profile_data[8][s] += 2.0*W.P/(SQR(W.B1c) + SQR(W.B2c) +
+            SQR(W.B3c));
+
+            /*Br*/
+            profile_data[9][s] += (W.B1c*x1 + W.B2c*x2 + W.B3c*x3)/r;
+#endif /*MHD*/
          }
       }
    }
@@ -1348,6 +1362,14 @@ void dump_profile(DomainS *pD, OutputS *pOut)
   col_cnt++;
   fprintf(pfile," [%d]=K",col_cnt);
   col_cnt++;
+#ifdef MHD
+  fprintf(pfile," [%d]=B^2",col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=Beta",col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=Br",col_cnt);
+  col_cnt++;
+#endif /*MHD*/
 
   fprintf(pfile,"\n");
 
@@ -1363,6 +1385,11 @@ void dump_profile(DomainS *pD, OutputS *pOut)
     fprintf(pfile, fmt, profile_data[4][c]);
     fprintf(pfile, fmt, profile_data[5][c]);
     fprintf(pfile, fmt, profile_data[6][c]);
+#ifdef MHD
+    fprintf(pfile, fmt, profile_data[7][c]);
+    fprintf(pfile, fmt, profile_data[8][c]);
+    fprintf(pfile, fmt, profile_data[9][c]);
+#endif /*MHD*/
 
     fprintf(pfile,"\n");
   }
