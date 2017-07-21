@@ -88,11 +88,11 @@ void dump_profile(DomainS *pD, OutputS *pOut);
 static Real **profile_data;
 static int n_bins;
 /*num, radius, P, rho, T, K, Mach, B^2, beta, Br*/
-const int n_profiles = 7
-#ifdef MHD
-   + 3
+#ifndef MHD
+const int n_profiles = 7;
+#else
+const int n_profiles = 10;
 #endif /*MHD*/
-;
 
 #ifdef MPI_PARALLEL
 static Real **profile_data_global;
