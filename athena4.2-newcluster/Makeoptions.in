@@ -110,8 +110,8 @@ ifeq ($(MACHINE),macosx)
 	OPT = -O3 
 	MPIINC = -I/usr/local/include
 	MPILIB = -L/usr/local/lib -lmpi
-	FFTWLIB = -L/opt/local/lib -lfftw3
-	FFTWINC = -I/opt/local/include
+	FFTWLIB = -L/usr/local/lib -lfftw3
+	FFTWINC = -I/usr/local/include
 endif
 endif
 endif
