@@ -1358,7 +1358,7 @@ void dump_profile(DomainS *pD, OutputS *pOut)
   col_cnt++;
   fprintf(pfile," [%d]=T",col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=M",col_cnt);
+  fprintf(pfile," [%d]=M^2",col_cnt);
   col_cnt++;
   fprintf(pfile," [%d]=K",col_cnt);
   col_cnt++;
