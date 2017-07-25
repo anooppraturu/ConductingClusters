@@ -351,9 +351,9 @@ static void perturb(DomainS *pDomain)
            A1[ke+k][j][i] = pGrid->U[ke+k][j][i].B1c;
 
            A2[ks-k][j][i] = pGrid->U[ks-k][j][i].B2c;
-           A2[ks-k][j][i] = pGrid->U[ks-k][j][i].B2c;
-           
-           A3[ke+k][j][i] = pGrid->U[ke+k][j][i].B3c;
+           A2[ke+k][j][i] = pGrid->U[ke+k][j][i].B2c;
+
+           A3[ks-k][j][i] = pGrid->U[ks-k][j][i].B3c;
            A3[ke+k][j][i] = pGrid->U[ke+k][j][i].B3c;
          }
       }
