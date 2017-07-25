@@ -225,7 +225,7 @@ static inline void generate()
   pspect(fA1);
   pspect(fA2);
   pspect(fA3);
-  
+
 
   /* Transform perturbations to real space, but don't normalize until
    * just before we apply them in perturb() */
@@ -286,7 +286,7 @@ static void perturb(DomainS *pDomain)
       }
     }
   }
- 
+
 #ifdef MPI_PARALLEL
   /* need to populate ghost zones... */
   /* ... copy to A B*c as a hack so that we can use the built-in
@@ -312,14 +312,14 @@ static void perturb(DomainS *pDomain)
   for (k=ks; k<=ke; k++) {
     for (j=js; j<=je; j++) {
       for (i=1; i<=nghost; i++) {
-	      A1[k][j][is-i] = pGrid->U[k][j][is-i].B1c;
-	      A1[k][j][ie+i] = pGrid->U[k][j][ie+i].B1c;
+              A1[k][j][is-i] = pGrid->U[k][j][is-i].B1c;
+              A1[k][j][ie+i] = pGrid->U[k][j][ie+i].B1c;
 
-	      A2[k][j][is-i] = pGrid->U[k][j][is-i].B2c;
-	      A2[k][j][ie+i] = pGrid->U[k][j][ie+i].B2c;
+              A2[k][j][is-i] = pGrid->U[k][j][is-i].B2c;
+              A2[k][j][ie+i] = pGrid->U[k][j][ie+i].B2c;
 
-	      A3[k][j][is-i] = pGrid->U[k][j][is-i].B3c;
-	      A3[k][j][ie+i] = pGrid->U[k][j][ie+i].B3c;
+              A3[k][j][is-i] = pGrid->U[k][j][is-i].B3c;
+              A3[k][j][ie+i] = pGrid->U[k][j][ie+i].B3c;
       }
     }
   }
@@ -328,16 +328,16 @@ static void perturb(DomainS *pDomain)
   if (pGrid->Nx[1] > 1){
     for (k=ks; k<=ke; k++) {
       for (j=1; j<=nghost; j++) {
-	 for (i=is-nghost; i<=ie+nghost; i++) {
-	    A1[k][js-j][i] = pGrid->U[k][js-j][i].B1c;
-	    A1[k][je+j][i] = pGrid->U[k][je+j][i].B1c;
+         for (i=is-nghost; i<=ie+nghost; i++) {
+            A1[k][js-j][i] = pGrid->U[k][js-j][i].B1c;
+            A1[k][je+j][i] = pGrid->U[k][je+j][i].B1c;
 
-	    A2[k][js-j][i] = pGrid->U[k][js-j][i].B2c;
-	    A2[k][je+j][i] = pGrid->U[k][je+j][i].B2c;
-	  
+            A2[k][js-j][i] = pGrid->U[k][js-j][i].B2c;
+            A2[k][je+j][i] = pGrid->U[k][je+j][i].B2c;
+
             A3[k][js-j][i] = pGrid->U[k][js-j][i].B3c;
-	    A3[k][je+j][i] = pGrid->U[k][je+j][i].B3c;
-	 }
+            A3[k][je+j][i] = pGrid->U[k][je+j][i].B3c;
+         }
       }
     }
   }
@@ -362,7 +362,7 @@ static void perturb(DomainS *pDomain)
 
   /* phew! */
 #endif /*MPI_PARALLEL*/
-    
+
   for (k=ks; k<=ke; k++) {
     for (j=js; j<=je; j++) {
       for (i=is; i<=ie+1; i++) {
@@ -492,7 +492,7 @@ void problem(DomainS *pDomain)
   rseed -= myID_Comm_world;
 #endif
   initialize(pGrid, pDomain);
-  
+
   set_vars(pGrid->time);
 
   /* find the shock and calculate the pre- and post-shock
@@ -1050,7 +1050,7 @@ void problem_read_restart(MeshS *pM, FILE *fp)
      }
   }
 #endif /*MPI_PARALLEL*/
-  
+
   /* Free Athena-style arrays */
   free_3d_array(A1);
   free_3d_array(A2);
@@ -1067,27 +1067,27 @@ void problem_read_restart(MeshS *pM, FILE *fp)
 #if (NSCALARS > 0)
 static Real scalar1(const GridS *pG, const int i, const int j, const int k)
 {
-   return pG->U[k][j][i].s[0]/pG->U[k][j][i].d;   
+   return pG->U[k][j][i].s[0]/pG->U[k][j][i].d;
 }
 
 static Real scalar2(const GridS *pG, const int i, const int j, const int k)
 {
-   return pG->U[k][j][i].s[1]/pG->U[k][j][i].d;   
+   return pG->U[k][j][i].s[1]/pG->U[k][j][i].d;
 }
 
 static Real scalar3(const GridS *pG, const int i, const int j, const int k)
 {
-   return pG->U[k][j][i].s[2]/pG->U[k][j][i].d;   
+   return pG->U[k][j][i].s[2]/pG->U[k][j][i].d;
 }
 
 static Real scalar4(const GridS *pG, const int i, const int j, const int k)
 {
-   return pG->U[k][j][i].s[3]/pG->U[k][j][i].d;   
+   return pG->U[k][j][i].s[3]/pG->U[k][j][i].d;
 }
 
 static Real scalar5(const GridS *pG, const int i, const int j, const int k)
 {
-   return pG->U[k][j][i].s[4]/pG->U[k][j][i].d;   
+   return pG->U[k][j][i].s[4]/pG->U[k][j][i].d;
 }
 #endif
 
@@ -1211,9 +1211,9 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
    for(k=ks; k<=ke; k++){
       for(j=js; j<=je; j++){
          for(i=is; i<=ie; i++){
-	   /*calculate radius in cell coordinates and corresponding index*/
-	   cc_pos(pGrid,i,j,k,&x1,&x2,&x3);
-	   r = sqrt(x1*x1 + x2*x2 + x3*x3);
+           /*calculate radius in cell coordinates and corresponding index*/
+           cc_pos(pGrid,i,j,k,&x1,&x2,&x3);
+           r = sqrt(x1*x1 + x2*x2 + x3*x3);
 
             /*FIX ME: Make binning more accurate*/
             s = (int) floor(r/dx1);
@@ -1260,7 +1260,7 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
 #ifdef MPI_PARALLEL
    /*TBH not sure if what I'm about to do will work*/
    ierr = MPI_Allreduce(&profile_data[0][0], &profile_data_global[0][0], n_bins*n_profiles,
-			MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+                        MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
    if(ierr)
       ath_error("[calc_profiles]: MPI_Allreduce returned error %d\n", ierr);
@@ -1277,9 +1277,9 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
    /*Divide through by 0th row of array (num) to get proper averages*/
    for(profile_index=1; profile_index<n_profiles; profile_index++){
      for(bin_index=0; bin_index<n_bins; bin_index++){
-	if(profile_data[0][bin_index]!= 0.0){
-	  profile_data[profile_index][bin_index] /= profile_data[0][bin_index];
-	}
+        if(profile_data[0][bin_index]!= 0.0){
+          profile_data[profile_index][bin_index] /= profile_data[0][bin_index];
+        }
      }
    }
 
@@ -1478,9 +1478,9 @@ void Userwork_after_loop(MeshS *pM)
 #ifdef MPI_PARALLEL
             }
 #endif /* MPI_PARALLEL */
-			}
-		}
-	}
+                        }
+                }
+        }
 
   /* free memory if necessary */
   if (profile_data != NULL) free_2d_array((void**) profile_data);
