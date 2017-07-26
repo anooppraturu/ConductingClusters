@@ -1298,6 +1298,44 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
      }
    }
 
+   /*Now that we have averages of T and Vr on the shell, go back and calculate convective heat fluxes*/
+   for(k=ks; k<=ke; k++){
+      for(j=js; j<=je; j++){
+         for(i=is; i<=ie; i++){
+           /*calculate radius in cell coordinates and corresponding index*/
+           cc_pos(pGrid,i,j,k,&x1,&x2,&x3);
+           r = sqrt(x1*x1 + x2*x2 + x3*x3);
+
+            /*FIX ME: Make binning more accurate*/
+            s = (int) floor(r/dx1);
+
+            W = Cons_to_Prim(&(pGrid->U[k][j][i]));
+
+	    /*(T-<T>)(Vr-<Vr>)*/
+	    profile_data[9][s] += (W.P/W.d - profile_data[4][s])*((W.V1*x1 + W.V2*x2 + W.V3*x3)/r - profile_data[7][s]);
+         }
+      }
+   }
+
+/*reduce arrays into prof_data_global, but only copy prof_data_global[9][*] back*/
+#ifdef MPI_PARALLEL
+   ierr = MPI_Allreduce(&profile_data[9][0], &profile_data_global[9][0], n_bins,
+                        MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
+   if(ierr)
+      ath_error("[calc_profiles]: MPI_Allreduce returned error %d\n", ierr);
+
+   for(bin_index=0; bin_index<n_bins; bin_index++){
+      profile_data[9][bin_index] = profile_data_global[9][bin_index];
+   }
+#endif /*MPI_PARALLEL*/
+
+   /*Divide through by 0th row of array (num) to get proper averages, but again only for prof_data[9][*]*/
+   for(bin_index=0; bin_index<n_bins; bin_index++){
+     if(profile_data[0][bin_index]!= 0.0){
+       profile_data[9][bin_index] /= profile_data[0][bin_index];
+     }
+   }
 
 
    return;
