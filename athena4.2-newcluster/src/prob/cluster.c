@@ -572,8 +572,9 @@ void problem(DomainS *pDomain)
 #if (NSCALARS > 0)
         x1m = pDomain->RootMaxX[0];
         halfwidth = x1m/(2.0*(float)NSCALARS);
+	pGrid->U[k][j][i].s[0] = 0.0;
 
-        for(n=0; n<NSCALARS; n++){
+        for(n=1; n<NSCALARS; n++){
            pGrid->U[k][j][i].s[n] = 0.5*(tanh(50.0*(r+halfwidth - halfwidth*(2.0*n+1.0)))+tanh(-50.0*(r-halfwidth-halfwidth*(2.0*n+1))));
         }
 #endif
@@ -1065,29 +1066,34 @@ void problem_read_restart(MeshS *pM, FILE *fp)
 
 
 #if (NSCALARS > 0)
-static Real scalar1(const GridS *pG, const int i, const int j, const int k)
+static Real metals(const GridS *pG, const int i, const int j, const int k)
 {
    return pG->U[k][j][i].s[0]/pG->U[k][j][i].d;
 }
 
-static Real scalar2(const GridS *pG, const int i, const int j, const int k)
+static Real scalar1(const GridS *pG, const int i, const int j, const int k)
 {
    return pG->U[k][j][i].s[1]/pG->U[k][j][i].d;
 }
 
-static Real scalar3(const GridS *pG, const int i, const int j, const int k)
+static Real scalar2(const GridS *pG, const int i, const int j, const int k)
 {
    return pG->U[k][j][i].s[2]/pG->U[k][j][i].d;
 }
 
-static Real scalar4(const GridS *pG, const int i, const int j, const int k)
+static Real scalar3(const GridS *pG, const int i, const int j, const int k)
 {
    return pG->U[k][j][i].s[3]/pG->U[k][j][i].d;
 }
 
-static Real scalar5(const GridS *pG, const int i, const int j, const int k)
+static Real scalar4(const GridS *pG, const int i, const int j, const int k)
 {
    return pG->U[k][j][i].s[4]/pG->U[k][j][i].d;
+}
+
+static Real scalar5(const GridS *pG, const int i, const int j, const int k)
+{
+   return pG->U[k][j][i].s[5]/pG->U[k][j][i].d;
 }
 #endif
 
@@ -1099,6 +1105,7 @@ ConsFun_t get_usr_expr(const char *expr)
    else if(strcmp(expr,"s3")==0) return scalar3;
    else if(strcmp(expr,"s4")==0) return scalar4;
    else if(strcmp(expr,"s5")==0) return scalar5;
+   else if(strcmp(expr, "metals")==0) return metals;
 #endif
   return NULL;
 }
