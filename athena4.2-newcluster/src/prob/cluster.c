@@ -100,6 +100,10 @@ static Real **profile_data_global;
 
 static void calc_profiles(DomainS *pDomain, Real **profile_data);
 
+/*Hisory Dump Stuff*/
+/* ------------------------------------------------------------------------ */
+static Real Metal_r2(const GridS *pG, const int i, const int j, const int k);
+
 
 /* FFT prototypes */
 /* ------------------------------------------------------------------------ */
@@ -586,6 +590,10 @@ void problem(DomainS *pDomain)
     }
   }
 
+   /*Add metal weighted r^2 to history dump*/
+#if (NSCALARS > 0)
+   dump_history_enroll(Metal_r2, "<Metal_r2>");
+#endif
 
   /* interface magnetic field */
 #ifdef MHD
@@ -1066,6 +1074,14 @@ void problem_read_restart(MeshS *pM, FILE *fp)
 
 
 #if (NSCALARS > 0)
+static Real Metal_r2(const GridS *pG, const int i, const int j, const int k)
+{
+   Real x1,x2,x3,rsqr;
+   cc_pos(pG,i,j,k,&x1,&x2,&x3);
+   rsqr = x1*x1 + x2*x2 + x3*x3;
+   return pG->U[k][j][i].s[0]*rsqr;
+}
+
 static Real metals(const GridS *pG, const int i, const int j, const int k)
 {
    return pG->U[k][j][i].s[0]/pG->U[k][j][i].d;
