@@ -87,11 +87,11 @@ void dump_profile(DomainS *pD, OutputS *pOut);
 
 static Real **profile_data;
 static int n_bins;
-/*num, radius, P, rho, T, K, Mach, B^2, beta, Br*/
+/*num, radius, P, rho, T, K, Mach, Vr, Metals, Convective Heat Flux, B^2, beta, Br, Alfven_Mach*/
 #ifndef MHD
-const int n_profiles = 7;
-#else
 const int n_profiles = 10;
+#else
+const int n_profiles = 14;
 #endif /*MHD*/
 
 #ifdef MPI_PARALLEL
@@ -1247,25 +1247,33 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
 
             /*Entropy*/
             profile_data[6][s] += W.P / pow(W.d,5.0/3.0);
+
+	    /*Radial Velocity*/
+	    profile_data[7][s] += (W.V1*x1 + W.V2*x2 + W.V3*x3)/r;
+
+	    /*Total Metals in a shell*/
+	    profile_data[8][s] += pGrid->U[k][j][i].s[0]*4.0*PI*SQR(r);
 #ifdef MHD
             /*B^2*/
-            profile_data[7][s] += SQR(W.B1c) + SQR(W.B2c) + SQR(W.B3c);
+            profile_data[10][s] += SQR(W.B1c) + SQR(W.B2c) + SQR(W.B3c);
 
             /*beta*/
-            profile_data[8][s] += 2.0*W.P/(SQR(W.B1c) + SQR(W.B2c) +
+            profile_data[11][s] += 2.0*W.P/(SQR(W.B1c) + SQR(W.B2c) +
             SQR(W.B3c));
 
             /*Br*/
-            profile_data[9][s] += (W.B1c*x1 + W.B2c*x2 + W.B3c*x3)/r;
+            profile_data[12][s] += (W.B1c*x1 + W.B2c*x2 + W.B3c*x3)/r;
+
+	    /*Alfven Mach Number squared*/
+	    profile_data[13][s] += W.d*(SQR(W.V1) + SQR(W.V2) + SQR(W.V3))/(SQR(W.B1c) + SQR(W.B2c) + SQR(W.B3c));
 #endif /*MHD*/
          }
       }
    }
 
 
-
+/*Note that since prof_data[9][*] is still 0, so too will prof_data_global[9][*]*/
 #ifdef MPI_PARALLEL
-   /*TBH not sure if what I'm about to do will work*/
    ierr = MPI_Allreduce(&profile_data[0][0], &profile_data_global[0][0], n_bins*n_profiles,
                         MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
@@ -1369,12 +1377,20 @@ void dump_profile(DomainS *pD, OutputS *pOut)
   col_cnt++;
   fprintf(pfile," [%d]=K",col_cnt);
   col_cnt++;
+  fprintf(pfile," [%d]=Vr",col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=Metal",col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=Convective Flux",col_cnt);
+  col_cnt++;
 #ifdef MHD
   fprintf(pfile," [%d]=B^2",col_cnt);
   col_cnt++;
   fprintf(pfile," [%d]=Beta",col_cnt);
   col_cnt++;
   fprintf(pfile," [%d]=Br",col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=Ma^2",col_cnt);
   col_cnt++;
 #endif /*MHD*/
 
@@ -1392,10 +1408,14 @@ void dump_profile(DomainS *pD, OutputS *pOut)
     fprintf(pfile, fmt, profile_data[4][c]);
     fprintf(pfile, fmt, profile_data[5][c]);
     fprintf(pfile, fmt, profile_data[6][c]);
-#ifdef MHD
     fprintf(pfile, fmt, profile_data[7][c]);
     fprintf(pfile, fmt, profile_data[8][c]);
     fprintf(pfile, fmt, profile_data[9][c]);
+#ifdef MHD
+    fprintf(pfile, fmt, profile_data[10][c]);
+    fprintf(pfile, fmt, profile_data[11][c]);
+    fprintf(pfile, fmt, profile_data[12][c]);
+    fprintf(pfile, fmt, profile_data[13][c]);
 #endif /*MHD*/
 
     fprintf(pfile,"\n");
