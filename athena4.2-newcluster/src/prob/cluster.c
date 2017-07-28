@@ -1626,7 +1626,12 @@ static Real grav_pot(const Real x1, const Real x2, const Real x3, const Real tim
 static Real kappa_fun(const Real d, const Real T,
                       const Real x1, const Real x2, const Real x3)
 {
-  return (1.039 * f_sp * pow(mu, 3.5) / mue * m15 * pow(T, 2.5));
+  /*factor of 2 roughly makes tvir equal peak temp of profile*/
+  Real Tvir = (m/2.0*rvir);
+  /* Limit temperature to ~1.5 * times the virial temperature so that
+     the hot gas around shocks doesn't kill us */
+  Real T1 = MIN(T, 1.5 * Tvir);	/* you have to calculate Tvir! */
+  return (1.039 * f_sp * pow(mu, 3.5) / mue * m15 * pow(T1, 2.5));
 }
 #endif  /* THERMAL_CONDUCTION */
 
