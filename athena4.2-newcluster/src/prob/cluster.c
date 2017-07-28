@@ -1264,11 +1264,11 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
             /*Entropy*/
             profile_data[6][s] += W.P / pow(W.d,5.0/3.0);
 
-	    /*Radial Velocity*/
-	    profile_data[7][s] += (W.V1*x1 + W.V2*x2 + W.V3*x3)/r;
+	         /*Radial Velocity*/
+	         profile_data[7][s] += (W.V1*x1 + W.V2*x2 + W.V3*x3)/r;
 
-	    /*Total Metals in a shell*/
-	    profile_data[8][s] += pGrid->U[k][j][i].s[0]*4.0*PI*SQR(r);
+	         /*Total Metals in a shell*/
+	         profile_data[8][s] += pGrid->U[k][j][i].s[0]*4.0*PI*SQR(r);
 #ifdef MHD
             /*B^2*/
             profile_data[10][s] += SQR(W.B1c) + SQR(W.B2c) + SQR(W.B3c);
@@ -1280,8 +1280,8 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
             /*Br*/
             profile_data[12][s] += (W.B1c*x1 + W.B2c*x2 + W.B3c*x3)/r;
 
-	    /*Alfven Mach Number squared*/
-	    profile_data[13][s] += W.d*(SQR(W.V1) + SQR(W.V2) + SQR(W.V3))/(SQR(W.B1c) + SQR(W.B2c) + SQR(W.B3c));
+	         /*Alfven Mach Number squared*/
+	         profile_data[13][s] += W.d*(SQR(W.V1) + SQR(W.V2) + SQR(W.V3))/(SQR(W.B1c) + SQR(W.B2c) + SQR(W.B3c));
 #endif /*MHD*/
          }
       }
@@ -1327,8 +1327,8 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
 
             W = Cons_to_Prim(&(pGrid->U[k][j][i]));
 
-	    /*(T-<T>)(Vr-<Vr>)*/
-	    profile_data[9][s] += (W.P/W.d - profile_data[4][s])*((W.V1*x1 + W.V2*x2 + W.V3*x3)/r - profile_data[7][s]);
+	         /*(T-<T>)(Vr-<Vr>)*/
+	         profile_data[9][s] += (W.P/W.d - profile_data[4][s])*((W.V1*x1 + W.V2*x2 + W.V3*x3)/r - profile_data[7][s]);
          }
       }
    }
@@ -1701,7 +1701,7 @@ static Real kappa_fun(const Real d, const Real T,
                       const Real x1, const Real x2, const Real x3)
 {
   /*factor of 2 roughly makes tvir equal peak temp of profile*/
-  Real Tvir = (m/2.0*rvir);
+  Real Tvir = m/(2.0*rvir);
   /* Limit temperature to ~1.5 * times the virial temperature so that
      the hot gas around shocks doesn't kill us */
   Real T1 = MIN(T, 1.5 * Tvir);	/* you have to calculate Tvir! */
