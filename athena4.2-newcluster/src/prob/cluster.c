@@ -87,11 +87,12 @@ void dump_profile(DomainS *pD, OutputS *pOut);
 
 static Real **profile_data;
 static int n_bins;
-/*num, radius, P, rho, T, K, Mach, Vr, Metals, Convective Heat Flux, B^2, beta, Br, Alfven_Mach*/
+/*num, radius, P, rho, T, K, Mach, Vr, Metals, Brem, rho^2, Fe23, Fe24, Fe25,
+ * Fe26, Assorted, uFe23, uFe24, uFe25, uFe26, uAssorted Convective Heat Flux, B^2, beta, Br, Alfven_Mach*/
 #ifndef MHD
-const int n_profiles = 10;
+const int n_profiles = 22;
 #else
-const int n_profiles = 14;
+const int n_profiles = 26;
 #endif /*MHD*/
 
 #ifdef MPI_PARALLEL
@@ -1269,26 +1270,67 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
 
 	         /*Total Metals in a shell*/
 	         profile_data[8][s] += pGrid->U[k][j][i].s[0]*4.0*PI*SQR(r);
+
+            /*Bremsstrahlung Emissivity*/
+            profile_data[9][s] += SQR(W.d)*sqrt(W.P/W.d);
+
+            /*density squared*/
+            profile_data[10][s] += SQR(W.d);
+
+            /*Fe23*/
+            profile_data[11][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d,
+            -3.04);
+
+            /*Fe24*/
+            profile_data[12][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d,
+            -1.23);
+
+            /*Fe25*/
+            profile_data[13][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d,
+            0.2);
+
+            /*Fe26*/
+            profile_data[14][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d,
+            2.41);
+
+            /*Assorted (S15, Si14, O8)*/
+            profile_data[15][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d,
+            -1.46);
+
+            /*uFe23*/
+            profile_data[16][s] += SQR(W.d)*pow(W.P/W.d, -3.04);
+
+            /*uFe24*/
+            profile_data[17][s] += SQR(W.d)*pow(W.P/W.d, -1.23);
+
+            /*uFe25*/
+            profile_data[18][s] += SQR(W.d)*pow(W.P/W.d, 0.2);
+
+            /*uFe26*/
+            profile_data[19][s] += SQR(W.d)*pow(W.P/W.d, 2.41);
+
+            /*uAssorted (S15, Si14, O8)*/
+            profile_data[20][s] += SQR(W.d)*pow(W.P/W.d, -1.46);
 #ifdef MHD
             /*B^2*/
-            profile_data[10][s] += SQR(W.B1c) + SQR(W.B2c) + SQR(W.B3c);
+            profile_data[22][s] += SQR(W.B1c) + SQR(W.B2c) + SQR(W.B3c);
 
             /*beta*/
-            profile_data[11][s] += 2.0*W.P/(SQR(W.B1c) + SQR(W.B2c) +
+            profile_data[23][s] += 2.0*W.P/(SQR(W.B1c) + SQR(W.B2c) +
             SQR(W.B3c));
 
             /*Br*/
-            profile_data[12][s] += (W.B1c*x1 + W.B2c*x2 + W.B3c*x3)/r;
+            profile_data[24][s] += (W.B1c*x1 + W.B2c*x2 + W.B3c*x3)/r;
 
 	         /*Alfven Mach Number squared*/
-	         profile_data[13][s] += W.d*(SQR(W.V1) + SQR(W.V2) + SQR(W.V3))/(SQR(W.B1c) + SQR(W.B2c) + SQR(W.B3c));
+	         profile_data[25][s] += W.d*(SQR(W.V1) + SQR(W.V2) + SQR(W.V3))/(SQR(W.B1c) + SQR(W.B2c) + SQR(W.B3c));
 #endif /*MHD*/
          }
       }
    }
 
 
-/*Note that since prof_data[9][*] is still 0, so too will prof_data_global[9][*]*/
+/*Note that since prof_data[21][*] is still 0, so too will prof_data_global[21][*]*/
 #ifdef MPI_PARALLEL
    ierr = MPI_Allreduce(&profile_data[0][0], &profile_data_global[0][0], n_bins*n_profiles,
                         MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
@@ -1328,7 +1370,7 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
             W = Cons_to_Prim(&(pGrid->U[k][j][i]));
 
 	         /*(T-<T>)(Vr-<Vr>)*/
-	         profile_data[9][s] += (W.P/W.d - profile_data[4][s])*((W.V1*x1 + W.V2*x2 + W.V3*x3)/r - profile_data[7][s]);
+	         profile_data[21][s] += (W.P/W.d - profile_data[4][s])*((W.V1*x1 + W.V2*x2 + W.V3*x3)/r - profile_data[7][s]);
          }
       }
    }
@@ -1436,6 +1478,30 @@ void dump_profile(DomainS *pD, OutputS *pOut)
   col_cnt++;
   fprintf(pfile," [%d]=Metal",col_cnt);
   col_cnt++;
+  fprintf(pfile," [%d]=Bremsstrahlung",col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=rho^2",col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=Fe23",col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=Fe24",col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=Fe25",col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=Fe26",col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=(S15,Si14,O8)",col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=uFe23",col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=uFe24",col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=uFe25",col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=uFe26",col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=u(S15,Si14,O8)",col_cnt);
+  col_cnt++;
   fprintf(pfile," [%d]=Convective Flux",col_cnt);
   col_cnt++;
 #ifdef MHD
@@ -1466,11 +1532,23 @@ void dump_profile(DomainS *pD, OutputS *pOut)
     fprintf(pfile, fmt, profile_data[7][c]);
     fprintf(pfile, fmt, profile_data[8][c]);
     fprintf(pfile, fmt, profile_data[9][c]);
-#ifdef MHD
     fprintf(pfile, fmt, profile_data[10][c]);
     fprintf(pfile, fmt, profile_data[11][c]);
     fprintf(pfile, fmt, profile_data[12][c]);
     fprintf(pfile, fmt, profile_data[13][c]);
+    fprintf(pfile, fmt, profile_data[14][c]);
+    fprintf(pfile, fmt, profile_data[15][c]);
+    fprintf(pfile, fmt, profile_data[16][c]);
+    fprintf(pfile, fmt, profile_data[17][c]);
+    fprintf(pfile, fmt, profile_data[18][c]);
+    fprintf(pfile, fmt, profile_data[19][c]);
+    fprintf(pfile, fmt, profile_data[20][c]);
+    fprintf(pfile, fmt, profile_data[21][c]);
+#ifdef MHD
+    fprintf(pfile, fmt, profile_data[22][c]);
+    fprintf(pfile, fmt, profile_data[23][c]);
+    fprintf(pfile, fmt, profile_data[24][c]);
+    fprintf(pfile, fmt, profile_data[25][c]);
 #endif /*MHD*/
 
     fprintf(pfile,"\n");
