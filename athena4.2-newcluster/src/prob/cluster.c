@@ -726,9 +726,12 @@ static void set_vars(Real time)
 
 
   /* calculate the number of bins to output */
+  /* n_bins runs along the cube diagonal, so
+       n_bins ~ sqrt(3)/2 * Nx ~ 0.86 Nx;
+     let's simply round this up to Nx.
+  */
   n_bins = MAX(pGrid->Nx[0], pGrid->Nx[1]);
   n_bins = MAX(pGrid->Nx[2], n_bins);
-  n_bins += 8;
 
 
   /* Allocate and initialize array to hold profile data */
