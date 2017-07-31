@@ -576,11 +576,12 @@ void problem(DomainS *pDomain)
 
 #if (NSCALARS > 0)
         x1m = pDomain->RootMaxX[0];
-        halfwidth = x1m/(2.0*(float)NSCALARS);
-	pGrid->U[k][j][i].s[0] = 0.0;
+        halfwidth = x1m/(2.0*NSCALARS);
+        pGrid->U[k][j][i].s[0] = 0.0;
 
         for(n=1; n<NSCALARS; n++){
-           pGrid->U[k][j][i].s[n] = 0.5*(tanh(50.0*(r+halfwidth - halfwidth*(2.0*n+1.0)))+tanh(-50.0*(r-halfwidth-halfwidth*(2.0*n+1))));
+           pGrid->U[k][j][i].s[n] = 0.5*( tanh( 50.0*(r + halfwidth - halfwidth*(2.0*n+1)))
+                                         +tanh(-50.0*(r - halfwidth - halfwidth*(2.0*n+1))));
         }
 #endif
 #ifndef ISOTHERMAL
@@ -591,7 +592,7 @@ void problem(DomainS *pDomain)
     }
   }
 
-   /*Add metal weighted r^2 to history dump*/
+   /* Add metal weighted r^2 to history dump */
 #if (NSCALARS > 0)
    dump_history_enroll(Metal_r2, "<Metal_r2>");
 #endif
@@ -637,7 +638,7 @@ void problem(DomainS *pDomain)
 }
 
 
-/* use in problem() and read_restart()*/
+/* use in problem() and read_restart() */
 static void set_vars(Real time)
 {
   char *atm_file;
@@ -1265,11 +1266,11 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
             /*Entropy*/
             profile_data[6][s] += W.P / pow(W.d,5.0/3.0);
 
-	         /*Radial Velocity*/
-	         profile_data[7][s] += (W.V1*x1 + W.V2*x2 + W.V3*x3)/r;
+                 /*Radial Velocity*/
+                 profile_data[7][s] += (W.V1*x1 + W.V2*x2 + W.V3*x3)/r;
 
-	         /*Total Metals in a shell*/
-	         profile_data[8][s] += pGrid->U[k][j][i].s[0]*4.0*PI*SQR(r);
+                 /*Total Metals in a shell*/
+                 profile_data[8][s] += pGrid->U[k][j][i].s[0]*4.0*PI*SQR(r);
 
             /*Bremsstrahlung Emissivity*/
             profile_data[9][s] += SQR(W.d)*sqrt(W.P/W.d);
@@ -1322,8 +1323,8 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
             /*Br*/
             profile_data[24][s] += (W.B1c*x1 + W.B2c*x2 + W.B3c*x3)/r;
 
-	         /*Alfven Mach Number squared*/
-	         profile_data[25][s] += W.d*(SQR(W.V1) + SQR(W.V2) + SQR(W.V3))/(SQR(W.B1c) + SQR(W.B2c) + SQR(W.B3c));
+                 /*Alfven Mach Number squared*/
+                 profile_data[25][s] += W.d*(SQR(W.V1) + SQR(W.V2) + SQR(W.V3))/(SQR(W.B1c) + SQR(W.B2c) + SQR(W.B3c));
 #endif /*MHD*/
          }
       }
@@ -1369,8 +1370,8 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
 
             W = Cons_to_Prim(&(pGrid->U[k][j][i]));
 
-	         /*(T-<T>)(Vr-<Vr>)*/
-	         profile_data[21][s] += (W.P/W.d - profile_data[4][s])*((W.V1*x1 + W.V2*x2 + W.V3*x3)/r - profile_data[7][s]);
+                 /*(T-<T>)(Vr-<Vr>)*/
+                 profile_data[21][s] += (W.P/W.d - profile_data[4][s])*((W.V1*x1 + W.V2*x2 + W.V3*x3)/r - profile_data[7][s]);
          }
       }
    }
