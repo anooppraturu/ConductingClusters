@@ -728,7 +728,7 @@ static void set_vars(Real time)
   /* calculate the number of bins to output */
   n_bins = MAX(pGrid->Nx[0], pGrid->Nx[1]);
   n_bins = MAX(pGrid->Nx[2], n_bins);
-  n_bins += 8.0;
+  n_bins += 8;
 
 
   /* Allocate and initialize array to hold profile data */
