@@ -1471,7 +1471,7 @@ void dump_profile(DomainS *pD, OutputS *pOut)
     fprintf(pfile,"# N = %d\n", n_bins);
   }
   fprintf(pfile,"# RADIAL PROFILE at Time= %g\n", pGrid->time);
-  fprintf(pfile,"#[z  m  h  rv] = [%f  %f  %f  %f]\n", z, m, h, rvir);
+  fprintf(pfile,"# [z  m  h  rv] = [%f  %f  %f  %f]\n", z, m, h, rvir);
 
   /* write out column headers.  Note column number is embedded in header */
   fprintf(pfile,"# [%d]=i",col_cnt);
