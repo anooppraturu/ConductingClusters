@@ -1208,9 +1208,9 @@ static void inner_bc(DomainS *pDomain)
   return;
 }
 
-/*Function to make radial profiles within loop*/
-/*didnt include int *nmax as argument to function*/
-/*Already loop over domains in Userwork_in_loop so I wrote this to only get passed domain, call it within loop in Userwork*/
+
+
+/* Function to make radial profiles of grid quantities*/
 static void calc_profiles(DomainS *pDomain, Real **profile_data)
 {
    int nl, nd;
@@ -1240,6 +1240,7 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
    ks = pGrid->ks; ke=pGrid->ke;
 
 
+   /* start out by zeroing profile arrays */
    for(prof_index = 0; prof_index<n_profiles; prof_index++){
       for(bin_index = 0; bin_index<n_bins; bin_index++){
          profile_data[prof_index][bin_index] = 0.0;
