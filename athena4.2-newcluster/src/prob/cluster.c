@@ -661,6 +661,7 @@ static void set_vars(Real time)
 #endif  /* STATIC_MESH_REFINEMENT */
 
   int iseed;
+  int bin_index, prof_index;
 
   iseed = -10;
 #ifdef MPI_PARALLEL
