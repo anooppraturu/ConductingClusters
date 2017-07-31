@@ -1476,12 +1476,8 @@ void dump_profile(DomainS *pD, OutputS *pOut)
     col_cnt++;
   }
 
-  /* TODO: change to the vars you want */
-  /* MM recommends: density, pressure, temperature, entropy, mach
-     number, maybe radial velocity.  try to keep this code flexible so
-     you can change it */
-  /* later, let's add magnetic energy and plasma beta */
 
+  /* print out headers for grid variables */
   fprintf(pfile," [%d]=rho", col_cnt);
   col_cnt++;
   fprintf(pfile," [%d]=P", col_cnt);
@@ -1620,7 +1616,6 @@ void Userwork_in_loop(MeshS *pM)
             calc_profiles(&(pM->Domain[nl][nd]), profile_data);
 
             /* finally, write the data to disk, but only on the root process */
-            /* Fancy configuration of if and ifdefs, not sure why this is necessary */
 #ifdef MPI_PARALLEL
             if (myID_Comm_world == 0){
 #endif /* MPI_PARALLEL */
