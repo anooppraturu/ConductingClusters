@@ -752,8 +752,8 @@ static void set_vars(Real time)
        n_bins ~ sqrt(3)/2 * Nx ~ 0.86 Nx;
      let's simply round this up to Nx.
   */
-  n_bins = MAX(pGrid->Nx[0], pGrid->Nx[1]);
-  n_bins = MAX(pGrid->Nx[2], n_bins);
+  n_bins = MAX(par_geti("domain1", "Nx1"), par_geti("domain1", "Nx2"));
+  n_bins = MAX(par_geti("domain1", "Nx3"), n_bins);
 
 
   /* Allocate and initialize array to hold profile data */
