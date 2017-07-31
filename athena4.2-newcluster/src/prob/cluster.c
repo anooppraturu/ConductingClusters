@@ -732,7 +732,7 @@ static void set_vars(Real time)
   n_bins += 8.0;
 
 
-  /*Allocate and initialize array to hold profile data*/
+  /* Allocate and initialize array to hold profile data */
   profile_data = (Real**) calloc_2d_array(n_profiles, n_bins, sizeof(Real));
   for(prof_index = 0; prof_index<n_profiles; prof_index++){
     for(bin_index = 0; bin_index<n_bins; bin_index++){
@@ -1140,13 +1140,14 @@ static Real scalar5(const GridS *pG, const int i, const int j, const int k)
 ConsFun_t get_usr_expr(const char *expr)
 {
 #if (NSCALARS > 0)
-   if(strcmp(expr,"s1")==0) return scalar1;
-   else if(strcmp(expr,"s2")==0) return scalar2;
-   else if(strcmp(expr,"s3")==0) return scalar3;
-   else if(strcmp(expr,"s4")==0) return scalar4;
-   else if(strcmp(expr,"s5")==0) return scalar5;
+   if(strcmp(expr,      "s1")==0) return scalar1;
+   else if(strcmp(expr, "s2")==0) return scalar2;
+   else if(strcmp(expr, "s3")==0) return scalar3;
+   else if(strcmp(expr, "s4")==0) return scalar4;
+   else if(strcmp(expr, "s5")==0) return scalar5;
    else if(strcmp(expr, "metals")==0) return metals;
 #endif
+
   return NULL;
 }
 
@@ -1221,10 +1222,11 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
 
    int prof_index;
 
-   int profile_index=0,bin_index=0;
+   int profile_index=0, bin_index=0;
 
    Real x1, x2, x3, dx1;
 
+   /* assume cubic cells! */
    dx1 = pDomain->dx[1];
 
 
@@ -1289,11 +1291,11 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
             /*Entropy*/
             profile_data[6][s] += W.P / pow(W.d,5.0/3.0);
 
-                 /*Radial Velocity*/
-                 profile_data[7][s] += (W.V1*x1 + W.V2*x2 + W.V3*x3)/r;
+            /*Radial Velocity*/
+            profile_data[7][s] += (W.V1*x1 + W.V2*x2 + W.V3*x3)/r;
 
-                 /*Total Metals in a shell*/
-                 profile_data[8][s] += pGrid->U[k][j][i].s[0]*4.0*PI*SQR(r);
+            /*Total Metals in a shell*/
+            profile_data[8][s] += pGrid->U[k][j][i].s[0]*4.0*PI*SQR(r);
 
             /*Bremsstrahlung Emissivity*/
             profile_data[9][s] += SQR(W.d)*sqrt(W.P/W.d);
@@ -1302,24 +1304,19 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
             profile_data[10][s] += SQR(W.d);
 
             /*Fe23*/
-            profile_data[11][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d,
-            -3.04);
+            profile_data[11][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d, -3.04);
 
             /*Fe24*/
-            profile_data[12][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d,
-            -1.23);
+            profile_data[12][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d, -1.23);
 
             /*Fe25*/
-            profile_data[13][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d,
-            0.2);
+            profile_data[13][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d, 0.2);
 
             /*Fe26*/
-            profile_data[14][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d,
-            2.41);
+            profile_data[14][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d, 2.41);
 
             /*Assorted (S15, Si14, O8)*/
-            profile_data[15][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d,
-            -1.46);
+            profile_data[15][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d, -1.46);
 
             /*uFe23*/
             profile_data[16][s] += SQR(W.d)*pow(W.P/W.d, -3.04);
@@ -1346,8 +1343,9 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
             /*Br*/
             profile_data[24][s] += (W.B1c*x1 + W.B2c*x2 + W.B3c*x3)/r;
 
-                 /*Alfven Mach Number squared*/
-                 profile_data[25][s] += W.d*(SQR(W.V1) + SQR(W.V2) + SQR(W.V3))/(SQR(W.B1c) + SQR(W.B2c) + SQR(W.B3c));
+            /*Alfven Mach Number squared*/
+            profile_data[25][s] += W.d*(SQR(W.V1)  + SQR(W.V2)  + SQR(W.V3))
+                                      /(SQR(W.B1c) + SQR(W.B2c) + SQR(W.B3c));
 #endif /*MHD*/
          }
       }
@@ -1436,10 +1434,7 @@ void dump_profile(DomainS *pD, OutputS *pOut)
   GridS *pGrid = pD->Grid;
   char outfilename[80] = "cluster";
 
-  /* Anoop, add whatever variables you need here */
   int c;
-
-  /* Anoop, mostly ignore this stuff until you see things flagged TODO */
 
   sprintf(fmt," %%12.8e"); /* Use a default format */
 
@@ -1474,11 +1469,11 @@ void dump_profile(DomainS *pD, OutputS *pOut)
   fprintf(pfile,"# [z  m  h  rv] = [%f  %f  %f  %f]\n", z, m, h, rvir);
 
   /* write out column headers.  Note column number is embedded in header */
-  fprintf(pfile,"# [%d]=i",col_cnt);
+  fprintf(pfile,"# [%d]=i", col_cnt);
   col_cnt++;
 
   if (pGrid->Nx[0] > 1) {
-    fprintf(pfile," [%d]=r",col_cnt);
+    fprintf(pfile," [%d]=r", col_cnt);
     col_cnt++;
   }
 
@@ -1488,54 +1483,54 @@ void dump_profile(DomainS *pD, OutputS *pOut)
      you can change it */
   /* later, let's add magnetic energy and plasma beta */
 
-  fprintf(pfile," [%d]=rho",col_cnt);
+  fprintf(pfile," [%d]=rho", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=P",col_cnt);
+  fprintf(pfile," [%d]=P", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=T",col_cnt);
+  fprintf(pfile," [%d]=T", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=M^2",col_cnt);
+  fprintf(pfile," [%d]=M^2", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=K",col_cnt);
+  fprintf(pfile," [%d]=K", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=Vr",col_cnt);
+  fprintf(pfile," [%d]=Vr", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=Metal",col_cnt);
+  fprintf(pfile," [%d]=Metal", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=Bremsstrahlung",col_cnt);
+  fprintf(pfile," [%d]=Bremsstrahlung", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=rho^2",col_cnt);
+  fprintf(pfile," [%d]=rho^2", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=Fe23",col_cnt);
+  fprintf(pfile," [%d]=Fe23", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=Fe24",col_cnt);
+  fprintf(pfile," [%d]=Fe24", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=Fe25",col_cnt);
+  fprintf(pfile," [%d]=Fe25", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=Fe26",col_cnt);
+  fprintf(pfile," [%d]=Fe26", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=(S15,Si14,O8)",col_cnt);
+  fprintf(pfile," [%d]=(S15,Si14,O8)", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=uFe23",col_cnt);
+  fprintf(pfile," [%d]=uFe23", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=uFe24",col_cnt);
+  fprintf(pfile," [%d]=uFe24", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=uFe25",col_cnt);
+  fprintf(pfile," [%d]=uFe25", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=uFe26",col_cnt);
+  fprintf(pfile," [%d]=uFe26", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=u(S15,Si14,O8)",col_cnt);
+  fprintf(pfile," [%d]=u(S15,Si14,O8)", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=Convective Flux",col_cnt);
+  fprintf(pfile," [%d]=Convective Flux", col_cnt);
   col_cnt++;
 #ifdef MHD
-  fprintf(pfile," [%d]=B^2",col_cnt);
+  fprintf(pfile," [%d]=B^2", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=Beta",col_cnt);
+  fprintf(pfile," [%d]=Beta", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=Br",col_cnt);
+  fprintf(pfile," [%d]=Br", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=Ma^2",col_cnt);
+  fprintf(pfile," [%d]=Ma^2", col_cnt);
   col_cnt++;
 #endif /*MHD*/
 
@@ -1652,19 +1647,19 @@ void Userwork_after_loop(MeshS *pM)
   for (nl=0; nl<=(pM->NLevels)-1; nl++) {
     for (nd=0; nd<=(pM->DomainsPerLevel[nl])-1; nd++) {
       if (pM->Domain[nl][nd].Grid != NULL) {
-            calc_profiles(&(pM->Domain[nl][nd]), profile_data);
+        calc_profiles(&(pM->Domain[nl][nd]), profile_data);
 
-            /* finally, write the data to disk, but only on the root process */
+        /* finally, write the data to disk, but only on the root process */
 #ifdef MPI_PARALLEL
-            if (myID_Comm_world == 0){
+        if (myID_Comm_world == 0){
 #endif /* MPI_PARALLEL */
-               dump_profile(&(pM->Domain[nl][nd]), &profile_dump);
+          dump_profile(&(pM->Domain[nl][nd]), &profile_dump);
 #ifdef MPI_PARALLEL
-            }
-#endif /* MPI_PARALLEL */
-                        }
-                }
         }
+#endif /* MPI_PARALLEL */
+      }
+    }
+  }
 
   /* free memory if necessary */
   if (profile_data != NULL) free_2d_array((void**) profile_data);
