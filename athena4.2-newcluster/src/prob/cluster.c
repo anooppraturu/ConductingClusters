@@ -129,6 +129,20 @@ static Real hst_metal_r2(const GridS *pG, const int i, const int j, const int k)
 #endif
 
 
+/* Slice outputs */
+/* ------------------------------------------------------------------------ */
+#if (NSCALARS > 0)
+static Real metals( const GridS *pG, const int i, const int j, const int k);
+#endif
+#if (NSCALARS == 6)
+static Real scalar1(const GridS *pG, const int i, const int j, const int k);
+static Real scalar2(const GridS *pG, const int i, const int j, const int k);
+static Real scalar3(const GridS *pG, const int i, const int j, const int k);
+static Real scalar4(const GridS *pG, const int i, const int j, const int k);
+static Real scalar5(const GridS *pG, const int i, const int j, const int k);
+#endif
+
+
 /* FFT prototypes */
 /* ------------------------------------------------------------------------ */
 
@@ -1110,56 +1124,17 @@ void problem_read_restart(MeshS *pM, FILE *fp)
   return;
 }
 
-
-#if (NSCALARS > 0)
-static Real Metal_r2(const GridS *pG, const int i, const int j, const int k)
-{
-   Real x1,x2,x3,rsqr;
-   cc_pos(pG,i,j,k,&x1,&x2,&x3);
-   rsqr = x1*x1 + x2*x2 + x3*x3;
-   return pG->U[k][j][i].s[0]*rsqr;
-}
-
-static Real metals(const GridS *pG, const int i, const int j, const int k)
-{
-   return pG->U[k][j][i].s[0]/pG->U[k][j][i].d;
-}
-
-static Real scalar1(const GridS *pG, const int i, const int j, const int k)
-{
-   return pG->U[k][j][i].s[1]/pG->U[k][j][i].d;
-}
-
-static Real scalar2(const GridS *pG, const int i, const int j, const int k)
-{
-   return pG->U[k][j][i].s[2]/pG->U[k][j][i].d;
-}
-
-static Real scalar3(const GridS *pG, const int i, const int j, const int k)
-{
-   return pG->U[k][j][i].s[3]/pG->U[k][j][i].d;
-}
-
-static Real scalar4(const GridS *pG, const int i, const int j, const int k)
-{
-   return pG->U[k][j][i].s[4]/pG->U[k][j][i].d;
-}
-
-static Real scalar5(const GridS *pG, const int i, const int j, const int k)
-{
-   return pG->U[k][j][i].s[5]/pG->U[k][j][i].d;
-}
-#endif
-
 ConsFun_t get_usr_expr(const char *expr)
 {
 #if (NSCALARS > 0)
-   if(strcmp(expr,      "s1")==0) return scalar1;
+   if(strcmp(expr, "metals")==0) return metals;
+#endif
+#if (NSCALARS == 6)
+   else if(strcmp(expr, "s1")==0) return scalar1;
    else if(strcmp(expr, "s2")==0) return scalar2;
    else if(strcmp(expr, "s3")==0) return scalar3;
    else if(strcmp(expr, "s4")==0) return scalar4;
    else if(strcmp(expr, "s5")==0) return scalar5;
-   else if(strcmp(expr, "metals")==0) return metals;
 #endif
 
   return NULL;
@@ -1869,4 +1844,43 @@ static Real hst_metal_r2(const GridS *pG, const int i, const int j, const int k)
 }
 #endif  /* NSCALARS */
 /* end history outputs */
+/* ========================================================================== */
+
+
+/* ========================================================================== */
+/* dye outputs for slice plots */
+#if (NSCALARS > 0)
+static Real metals(const GridS *pG, const int i, const int j, const int k)
+{
+   return pG->U[k][j][i].s[0]/pG->U[k][j][i].d;
+}
+#endif
+
+#if (NSCALARS == 6)
+static Real scalar1(const GridS *pG, const int i, const int j, const int k)
+{
+   return pG->U[k][j][i].s[1]/pG->U[k][j][i].d;
+}
+
+static Real scalar2(const GridS *pG, const int i, const int j, const int k)
+{
+   return pG->U[k][j][i].s[2]/pG->U[k][j][i].d;
+}
+
+static Real scalar3(const GridS *pG, const int i, const int j, const int k)
+{
+   return pG->U[k][j][i].s[3]/pG->U[k][j][i].d;
+}
+
+static Real scalar4(const GridS *pG, const int i, const int j, const int k)
+{
+   return pG->U[k][j][i].s[4]/pG->U[k][j][i].d;
+}
+
+static Real scalar5(const GridS *pG, const int i, const int j, const int k)
+{
+   return pG->U[k][j][i].s[5]/pG->U[k][j][i].d;
+}
+#endif
+/* end slice outputs */
 /* ========================================================================== */
