@@ -87,8 +87,24 @@ void dump_profile(DomainS *pD, OutputS *pOut);
 
 static Real **profile_data;
 static int n_bins;
-/*num, radius, P, rho, T, K, Mach, Vr, Metals, Brem, rho^2, Fe23, Fe24, Fe25,
- * Fe26, Assorted, uFe23, uFe24, uFe25, uFe26, uAssorted Convective Heat Flux, B^2, beta, Br, Alfven_Mach*/
+/* radial coordinates:
+     num, radius,
+
+   thermodynamic variables:
+     P, rho, T, K, Mach, Vr, Metals,
+
+   bremstrahlung and clumping factor:
+     Brem, rho^2,
+
+   line luminosity:
+     Fe23, Fe24, Fe25, Fe26, (S15, Si14, O8),
+
+   line luminosity assuming uniform metallicity:
+     uFe23, uFe24, uFe25, uFe26, u(S15, Si14, O8),
+
+   MTI and magnetic fields:
+     Convective Heat Flux, B^2, beta, Br, Alfven_Mach
+*/
 #ifndef MHD
 const int n_profiles = 22;
 #else
