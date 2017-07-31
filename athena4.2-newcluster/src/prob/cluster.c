@@ -492,10 +492,6 @@ void problem(DomainS *pDomain)
   Real rho, P, v, KE, phi;
   Real rhoi, rhoshock, Pshock, phishock, rshock, fact;
 
-  int Nx = pDomain->Nx[0];
-  int Ny = pDomain->Nx[1];
-  int Nz = pDomain->Nx[2];
-
   int prof_index,bin_index;
 
   is = pGrid->is; ie = pGrid->ie;
