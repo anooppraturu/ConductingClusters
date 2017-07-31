@@ -109,7 +109,7 @@ static int n_bins;
 const int n_profiles = 22;
 #else
 const int n_profiles = 26;
-#endif /*MHD*/
+#endif /* MHD */
 
 #ifdef MPI_PARALLEL
 static Real **profile_data_global;
@@ -117,7 +117,7 @@ static Real **profile_data_global;
 
 static void calc_profiles(DomainS *pDomain, Real **profile_data);
 
-/*Hisory Dump Stuff*/
+/* Hisory Dump Stuff */
 /* ------------------------------------------------------------------------ */
 static Real Metal_r2(const GridS *pG, const int i, const int j, const int k);
 
@@ -232,7 +232,6 @@ static inline void transform()
   ath_3d_fft(plan, fA2);
   ath_3d_fft(plan, fA3);
 
-  /*I think the below is from Jimmy's original turb.c, ignore I guess...*/
   /* Should technically renormalize (divide by gnx1*gnx2*gnx3) here, but
    * since we're going to renormalize to get the desired energy injection
    * rate anyway, there's no point */
@@ -382,7 +381,7 @@ static void perturb(DomainS *pDomain)
   }
 
   /* phew! */
-#endif /*MPI_PARALLEL*/
+#endif /* MPI_PARALLEL */
 
   for (k=ks; k<=ke; k++) {
     for (j=js; j<=je; j++) {
@@ -532,7 +531,7 @@ void problem(DomainS *pDomain)
   rhoshock = 4.0/(1.0 + 5.0*Tigm/SQR(v)) * rhoi;
   Pshock   = ((4.0/3.0)*SQR(v) - Tigm/4.0) * rhoi;
 
-  /*Stuff to dump*/
+  /* Stuff to dump */
   profile_dump.n      = 100;
   profile_dump.dt     = par_getd("problem", "dt");
   profile_dump.t      = pGrid->time;
@@ -747,7 +746,7 @@ static void set_vars(Real time)
       profile_data_global[prof_index][bin_index] = 0.0;
     }
   }
-#endif /*MPI_PARALLEL*/
+#endif /* MPI_PARALLEL */
 
 
   /* Add metal weighted r^2 to history dump */
@@ -1068,7 +1067,7 @@ void problem_read_restart(MeshS *pM, FILE *fp)
   fread(&profile_dump.t,   sizeof(Real),  1, fp);
   fread(&profile_dump.dt,  sizeof(Real),  1, fp);
 
-  /*Allocate and initialize array to hold profile data*/
+  /* Allocate and initialize array to hold profile data */
   profile_data = (Real**)calloc_2d_array(n_bins, n_profiles, sizeof(Real));
   for(prof_index = 0; prof_index<n_profiles; prof_index++){
      for(bin_index = 0; bin_index<n_bins; bin_index++){
@@ -1082,7 +1081,7 @@ void problem_read_restart(MeshS *pM, FILE *fp)
         profile_data_global[prof_index][bin_index] = 0.0;
      }
   }
-#endif /*MPI_PARALLEL*/
+#endif /* MPI_PARALLEL */
 
   /* Free Athena-style arrays */
   free_3d_array(A1);
@@ -1232,7 +1231,7 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
 
 #ifdef MPI_PARALLEL
    int ierr;
-#endif /*MPI_PARALLEL*/
+#endif /* MPI_PARALLEL */
 
    PrimS W;
    ConsS U;
@@ -1255,104 +1254,104 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
          profile_data_global[prof_index][bin_index] = 0.0;
       }
    }
-#endif /*MPI_PARALLEL*/
+#endif /* MPI_PARALLEL */
 
 
    for(k=ks; k<=ke; k++){
       for(j=js; j<=je; j++){
          for(i=is; i<=ie; i++){
-           /*calculate radius in cell coordinates and corresponding index*/
+           /* calculate radius in cell coordinates and corresponding index */
            cc_pos(pGrid,i,j,k,&x1,&x2,&x3);
            r = sqrt(x1*x1 + x2*x2 + x3*x3);
 
-            /*FIX ME: Make binning more accurate*/
+            /* FIX ME: Make binning more accurate */
             s = (int) floor(r/dx1);
 
             W = Cons_to_Prim(&(pGrid->U[k][j][i]));
 
-            /*0 contains number of bins correspinding to a given s*/
+            /* 0 contains number of bins correspinding to a given s */
             profile_data[0][s] += 1.0;
 
-            /*1 sums radii so that we can calculate avg R corresponding to a given s*/
+            /* 1 sums radii so that we can calculate avg R corresponding to a given s */
             profile_data[1][s] += r;
 
-            /*density*/
+            /* density */
             profile_data[2][s] += W.d;
 
-            /*pressure*/
+            /* pressure */
             profile_data[3][s] += W.P;
 
-            /*temperature*/
+            /* temperature */
             profile_data[4][s] += W.P/W.d;
 
-            /*Mach number squared*/
+            /* Mach number squared */
             profile_data[5][s] += W.d*(SQR(W.V1) + SQR(W.V2) + SQR(W.V3)) / W.P;
 
-            /*Entropy*/
+            /* Entropy */
             profile_data[6][s] += W.P / pow(W.d,5.0/3.0);
 
-            /*Radial Velocity*/
+            /* Radial Velocity */
             profile_data[7][s] += (W.V1*x1 + W.V2*x2 + W.V3*x3)/r;
 
-            /*Total Metals in a shell*/
+            /* Total Metals in a shell */
             profile_data[8][s] += pGrid->U[k][j][i].s[0]*4.0*PI*SQR(r);
 
-            /*Bremsstrahlung Emissivity*/
+            /* Bremsstrahlung Emissivity */
             profile_data[9][s] += SQR(W.d)*sqrt(W.P/W.d);
 
-            /*density squared*/
+            /* density squared */
             profile_data[10][s] += SQR(W.d);
 
-            /*Fe23*/
+            /* Fe23 */
             profile_data[11][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d, -3.04);
 
-            /*Fe24*/
+            /* Fe24 */
             profile_data[12][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d, -1.23);
 
-            /*Fe25*/
+            /* Fe25 */
             profile_data[13][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d, 0.2);
 
-            /*Fe26*/
+            /* Fe26 */
             profile_data[14][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d, 2.41);
 
-            /*Assorted (S15, Si14, O8)*/
+            /* Assorted (S15, Si14, O8) */
             profile_data[15][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d, -1.46);
 
-            /*uFe23*/
+            /* uFe23 */
             profile_data[16][s] += SQR(W.d)*pow(W.P/W.d, -3.04);
 
-            /*uFe24*/
+            /* uFe24 */
             profile_data[17][s] += SQR(W.d)*pow(W.P/W.d, -1.23);
 
-            /*uFe25*/
+            /* uFe25 */
             profile_data[18][s] += SQR(W.d)*pow(W.P/W.d, 0.2);
 
-            /*uFe26*/
+            /* uFe26 */
             profile_data[19][s] += SQR(W.d)*pow(W.P/W.d, 2.41);
 
-            /*uAssorted (S15, Si14, O8)*/
+            /* uAssorted (S15, Si14, O8) */
             profile_data[20][s] += SQR(W.d)*pow(W.P/W.d, -1.46);
 #ifdef MHD
-            /*B^2*/
+            /* B^2 */
             profile_data[22][s] += SQR(W.B1c) + SQR(W.B2c) + SQR(W.B3c);
 
-            /*beta*/
+            /* beta */
             profile_data[23][s] += 2.0*W.P/(SQR(W.B1c) + SQR(W.B2c) +
             SQR(W.B3c));
 
-            /*Br*/
+            /* Br */
             profile_data[24][s] += (W.B1c*x1 + W.B2c*x2 + W.B3c*x3)/r;
 
-            /*Alfven Mach Number squared*/
+            /* Alfven Mach Number squared */
             profile_data[25][s] += W.d*(SQR(W.V1)  + SQR(W.V2)  + SQR(W.V3))
                                       /(SQR(W.B1c) + SQR(W.B2c) + SQR(W.B3c));
-#endif /*MHD*/
+#endif /* MHD */
          }
       }
    }
 
 
-/*Note that since prof_data[21][*] is still 0, so too will prof_data_global[21][*]*/
+/* Note that since prof_data[21][*] is still 0, so too will prof_data_global[21][*] */
 #ifdef MPI_PARALLEL
    ierr = MPI_Allreduce(&profile_data[0][0], &profile_data_global[0][0], n_bins*n_profiles,
                         MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
@@ -1365,11 +1364,11 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
          profile_data[profile_index][bin_index] = profile_data_global[profile_index][bin_index];
       }
    }
-#endif /*MPI_PARALLEL*/
+#endif /* MPI_PARALLEL */
 
 
 
-   /*Divide through by 0th row of array (num) to get proper averages*/
+   /* Divide through by 0th row of array (num) to get proper averages */
    for(profile_index=1; profile_index<n_profiles; profile_index++){
      for(bin_index=0; bin_index<n_bins; bin_index++){
         if(profile_data[0][bin_index]!= 0.0){
@@ -1378,15 +1377,15 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
      }
    }
 
-   /*Now that we have averages of T and Vr on the shell, go back and calculate convective heat fluxes*/
+   /* Now that we have averages of T and Vr on the shell, go back and calculate convective heat fluxes */
    for(k=ks; k<=ke; k++){
       for(j=js; j<=je; j++){
          for(i=is; i<=ie; i++){
-           /*calculate radius in cell coordinates and corresponding index*/
+           /* calculate radius in cell coordinates and corresponding index */
            cc_pos(pGrid,i,j,k,&x1,&x2,&x3);
            r = sqrt(x1*x1 + x2*x2 + x3*x3);
 
-            /*FIX ME: Make binning more accurate*/
+            /* FIX ME: Make binning more accurate */
             s = (int) floor(r/dx1);
 
             W = Cons_to_Prim(&(pGrid->U[k][j][i]));
@@ -1397,7 +1396,7 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
       }
    }
 
-/*reduce arrays into prof_data_global, but only copy prof_data_global[9][*] back*/
+/* reduce arrays into prof_data_global, but only copy prof_data_global[9][*] back */
 #ifdef MPI_PARALLEL
    ierr = MPI_Allreduce(&profile_data[9][0], &profile_data_global[9][0], n_bins,
                         MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
@@ -1408,9 +1407,9 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
    for(bin_index=0; bin_index<n_bins; bin_index++){
       profile_data[9][bin_index] = profile_data_global[9][bin_index];
    }
-#endif /*MPI_PARALLEL*/
+#endif /* MPI_PARALLEL */
 
-   /*Divide through by 0th row of array (num) to get proper averages, but again only for prof_data[9][*]*/
+   /* Divide through by 0th row of array (num) to get proper averages, but again only for prof_data[9][*] */
    for(bin_index=0; bin_index<n_bins; bin_index++){
      if(profile_data[0][bin_index]!= 0.0){
        profile_data[9][bin_index] /= profile_data[0][bin_index];
@@ -1532,7 +1531,7 @@ void dump_profile(DomainS *pD, OutputS *pOut)
   col_cnt++;
   fprintf(pfile," [%d]=Ma^2", col_cnt);
   col_cnt++;
-#endif /*MHD*/
+#endif /* MHD */
 
   fprintf(pfile,"\n");
 
@@ -1568,7 +1567,7 @@ void dump_profile(DomainS *pD, OutputS *pOut)
     fprintf(pfile, fmt, profile_data[23][c]);
     fprintf(pfile, fmt, profile_data[24][c]);
     fprintf(pfile, fmt, profile_data[25][c]);
-#endif /*MHD*/
+#endif /* MHD */
 
     fprintf(pfile,"\n");
   }
@@ -1621,7 +1620,7 @@ void Userwork_in_loop(MeshS *pM)
             calc_profiles(&(pM->Domain[nl][nd]), profile_data);
 
             /* finally, write the data to disk, but only on the root process */
-            /*Fancy configuration of if and ifdefs, not sure why this is necessary*/
+            /* Fancy configuration of if and ifdefs, not sure why this is necessary */
 #ifdef MPI_PARALLEL
             if (myID_Comm_world == 0){
 #endif /* MPI_PARALLEL */
@@ -1798,7 +1797,7 @@ static Real grav_pot(const Real x1, const Real x2, const Real x3, const Real tim
 static Real kappa_fun(const Real d, const Real T,
                       const Real x1, const Real x2, const Real x3)
 {
-  /*factor of 2 roughly makes tvir equal peak temp of profile*/
+  /* factor of 2 roughly makes tvir equal peak temp of profile */
   Real Tvir = m/(2.0*rvir);
   /* Limit temperature to ~1.5 * times the virial temperature so that
      the hot gas around shocks doesn't kill us */
