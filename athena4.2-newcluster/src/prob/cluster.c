@@ -589,12 +589,12 @@ void problem(DomainS *pDomain)
 
 #if (NSCALARS > 0)
         x1m = pDomain->RootMaxX[0];
-        halfwidth = x1m/(2.0*NSCALARS);
+        halfwidth = x1m/(2.0*(NSCALARS-1.0));
         pGrid->U[k][j][i].s[0] = 0.0;
 
         for(n=1; n<NSCALARS; n++){
-           pGrid->U[k][j][i].s[n] = 0.5*( tanh( 50.0*(r + halfwidth - halfwidth*(2.0*n+1)))
-                                         +tanh(-50.0*(r - halfwidth - halfwidth*(2.0*n+1))));
+           pGrid->U[k][j][i].s[n] = 0.5*( tanh( 50.0*(r + halfwidth - halfwidth*(2.0*(n-1)+1)))
+                                         +tanh(-50.0*(r - halfwidth - halfwidth*(2.0*(n-1)+1))));
         }
 #endif
 #ifndef ISOTHERMAL
