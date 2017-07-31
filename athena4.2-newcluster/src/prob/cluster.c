@@ -1356,8 +1356,10 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
             /* Radial Velocity */
             profile_data[7][s] += (W.V1*x1 + W.V2*x2 + W.V3*x3)/r;
 
+#if (NSCALARS>0)
             /* Total Metals in a shell */
             profile_data[8][s] += pGrid->U[k][j][i].s[0]*4.0*PI*SQR(r);
+#endif
 
             /* Bremsstrahlung Emissivity */
             profile_data[9][s] += SQR(W.d)*sqrt(W.P/W.d);
@@ -1365,6 +1367,7 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
             /* density squared */
             profile_data[10][s] += SQR(W.d);
 
+#if (NSCALARS>0)
             /* Fe23 */
             profile_data[11][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d, -3.04);
 
@@ -1379,6 +1382,7 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
 
             /* Assorted (S15, Si14, O8) */
             profile_data[15][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d, -1.46);
+#endif
 
             /* uFe23 */
             profile_data[16][s] += SQR(W.d)*pow(W.P/W.d, -3.04);
