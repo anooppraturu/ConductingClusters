@@ -117,9 +117,16 @@ static Real **profile_data_global;
 
 static void calc_profiles(DomainS *pDomain, Real **profile_data);
 
+
 /* Hisory Dump Stuff */
 /* ------------------------------------------------------------------------ */
-static Real Metal_r2(const GridS *pG, const int i, const int j, const int k);
+static Real hst_redshift(const GridS *pG, const int i, const int j, const int k);
+static Real hst_halomass(const GridS *pG, const int i, const int j, const int k);
+static Real hst_rvir(    const GridS *pG, const int i, const int j, const int k);
+
+#if (NSCALARS > 0)
+static Real hst_metal_r2(const GridS *pG, const int i, const int j, const int k);
+#endif
 
 
 /* FFT prototypes */
@@ -752,9 +759,14 @@ static void set_vars(Real time)
 #endif /* MPI_PARALLEL */
 
 
+  /* enroll extra outputs in the history dump */
+  dump_history_enroll(hst_redshift, "redshift");
+  dump_history_enroll(hst_halomass, "halo mass");
+  dump_history_enroll(hst_rvir,     "virial radius");
+
   /* Add metal weighted r^2 to history dump */
 #if (NSCALARS > 0)
-  dump_history_enroll(Metal_r2, "<Metal_r2>");
+  dump_history_enroll(hst_metal_r2, "<Metal_r2>");
 #endif
 
 
@@ -1813,4 +1825,48 @@ static Real nu_fun(const Real d, const Real T,
 }
 #endif  /* VISCOSITY */
 /* end transport coefficients */
+/* ========================================================================== */
+
+
+/* ========================================================================== */
+/* history outputs */
+static Real hst_redshift(const GridS *pG, const int i, const int j, const int k)
+{
+  Real z;
+  z = zz(pG->time + t_ofst);
+
+  return(z);
+}
+
+static Real hst_halomass(const GridS *pG, const int i, const int j, const int k)
+{
+  Real z, m;
+  z = zz(pG->time + t_ofst);
+  m = mm(z);
+
+  return(m);
+}
+
+static Real hst_rvir(const GridS *pG, const int i, const int j, const int k)
+{
+  Real z, m, h, rvir;
+  z = zz(pG->time + t_ofst);
+  m = mm(z);
+  h = hh(z);
+
+  rvir = pow(m, 1.0/3.0) * pow(10.0*h, -2.0/3.0);
+
+  return(rvir);
+}
+
+#if (NSCALARS > 0)
+static Real hst_metal_r2(const GridS *pG, const int i, const int j, const int k)
+{
+   Real x1,x2,x3,rsqr;
+   cc_pos(pG,i,j,k,&x1,&x2,&x3);
+   rsqr = x1*x1 + x2*x2 + x3*x3;
+   return pG->U[k][j][i].s[0]*rsqr;
+}
+#endif  /* NSCALARS */
+/* end history outputs */
 /* ========================================================================== */
