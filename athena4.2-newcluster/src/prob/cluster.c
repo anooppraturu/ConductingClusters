@@ -1143,6 +1143,12 @@ ConsFun_t get_usr_expr(const char *expr)
 VOutFun_t get_usr_out_fun(const char *name){
   return NULL;
 }
+/* end athena "User" functions */
+/* ========================================================================== */
+
+
+/* ========================================================================== */
+/* userwork_in_loop: apply an "inner" BC to emulate cosmology */
 
 /* "inner" bc: set density, temperature, and velocity at r = 2 r_vir. */
 /*   use global variables rho_out, Tigm, and rvir */
@@ -1199,6 +1205,72 @@ static void inner_bc(DomainS *pDomain)
 }
 
 
+/* calculate rho and T at the turnaround radius and call inner_bc() */
+void Userwork_in_loop(MeshS *pM)
+{
+  int nl, nd;
+#ifdef MPI_PARALLEL
+  int ierr;
+#endif	/* MPI_PARALLEL */
+
+  z = zz(pM->time + t_ofst);
+  m = mm(z);
+  h = hh(z);
+
+  rvir = pow(m, 1.0/3.0) * pow(10.0*h, -2.0/3.0);
+  if (2.0 * rvir >= rout){
+    ath_error("[Userwork_in_loop]: virial radius exceeds domain size.\n");
+  }
+
+  ath_pout(0, "[z  m  h  rv] = [%f  %f  %f  %f]\n", z, m, h, rvir);
+
+  /* construct the outer density */
+  /* -- start with the critical density at rvir */
+  rho_out = 200.0 * fb * 3.0/(8*PI) * SQR(h);
+  /* -- scale to 2*r_vir using nfw profile */
+  rho_out *=  log(1.0+2.0*c_nfw)/log(1.0+c_nfw)/8.0;
+  /* -- fix to the accretion rate (unique to James' formula)*/
+  rho_out /= (1.0 + 3.0*Om/g * pow(1.0+z, 3)/(1.0+z-b)/SQR(h));
+
+  for (nl=0; nl<=(pM->NLevels)-1; nl++) {
+    for (nd=0; nd<=(pM->DomainsPerLevel[nl])-1; nd++) {
+      if (pM->Domain[nl][nd].Grid != NULL) {
+        inner_bc(&(pM->Domain[nl][nd]));
+
+         /* check whether we need to do an output */
+         if(pM->time >= profile_dump.t){
+
+            /* first, update output time */
+            profile_dump.t += profile_dump.dt;
+
+            /* next, calculate the radial profiles and store them in the global array */
+            calc_profiles(&(pM->Domain[nl][nd]), profile_data);
+
+            /* finally, write the data to disk, but only on the root process */
+#ifdef MPI_PARALLEL
+            if (myID_Comm_world == 0){
+#endif /* MPI_PARALLEL */
+               dump_profile(&(pM->Domain[nl][nd]), &profile_dump);
+#ifdef MPI_PARALLEL
+            }
+#endif /* MPI_PARALLEL */
+
+            profile_dump.num += 1;
+         }
+        if (cooling > 0)
+          integrate_cool(&(pM->Domain[nl][nd]), pM->dt);
+      }
+    }
+  }
+
+  return;
+}
+/* end userwork_in_loop */
+/* ========================================================================== */
+
+
+/* ========================================================================== */
+/* output radial profiles periodically throughout the simualtion */
 
 /* Function to make radial profiles of grid quantities*/
 static void calc_profiles(DomainS *pDomain, Real **profile_data)
@@ -1563,68 +1635,6 @@ void dump_profile(DomainS *pD, OutputS *pOut)
   return;
 }
 
-
-/* calculate rho and T at the turnaround radius and call inner_bc() */
-void Userwork_in_loop(MeshS *pM)
-{
-  int nl, nd;
-#ifdef MPI_PARALLEL
-  int ierr;
-#endif	/* MPI_PARALLEL */
-
-  z = zz(pM->time + t_ofst);
-  m = mm(z);
-  h = hh(z);
-
-  rvir = pow(m, 1.0/3.0) * pow(10.0*h, -2.0/3.0);
-  if (2.0 * rvir >= rout){
-    ath_error("[Userwork_in_loop]: virial radius exceeds domain size.\n");
-  }
-
-  ath_pout(0, "[z  m  h  rv] = [%f  %f  %f  %f]\n", z, m, h, rvir);
-
-  /* construct the outer density */
-  /* -- start with the critical density at rvir */
-  rho_out = 200.0 * fb * 3.0/(8*PI) * SQR(h);
-  /* -- scale to 2*r_vir using nfw profile */
-  rho_out *=  log(1.0+2.0*c_nfw)/log(1.0+c_nfw)/8.0;
-  /* -- fix to the accretion rate (unique to James' formula)*/
-  rho_out /= (1.0 + 3.0*Om/g * pow(1.0+z, 3)/(1.0+z-b)/SQR(h));
-
-  for (nl=0; nl<=(pM->NLevels)-1; nl++) {
-    for (nd=0; nd<=(pM->DomainsPerLevel[nl])-1; nd++) {
-      if (pM->Domain[nl][nd].Grid != NULL) {
-        inner_bc(&(pM->Domain[nl][nd]));
-
-         /* check whether we need to do an output */
-         if(pM->time >= profile_dump.t){
-
-            /* first, update output time */
-            profile_dump.t += profile_dump.dt;
-
-            /* next, calculate the radial profiles and store them in the global array */
-            calc_profiles(&(pM->Domain[nl][nd]), profile_data);
-
-            /* finally, write the data to disk, but only on the root process */
-#ifdef MPI_PARALLEL
-            if (myID_Comm_world == 0){
-#endif /* MPI_PARALLEL */
-               dump_profile(&(pM->Domain[nl][nd]), &profile_dump);
-#ifdef MPI_PARALLEL
-            }
-#endif /* MPI_PARALLEL */
-
-            profile_dump.num += 1;
-         }
-        if (cooling > 0)
-          integrate_cool(&(pM->Domain[nl][nd]), pM->dt);
-      }
-    }
-  }
-
-  return;
-}
-
 void Userwork_after_loop(MeshS *pM)
 {
   int nl, nd;
@@ -1657,8 +1667,12 @@ void Userwork_after_loop(MeshS *pM)
 
   return;
 }
+/* end code for radial profiles */
+/* ========================================================================== */
 
 
+/* ========================================================================== */
+/* random number generator */
 #define IM1 2147483563
 #define IM2 2147483399
 #define AM (1.0/IM1)
@@ -1735,11 +1749,7 @@ double ran2(long int *idum){
 #undef NTAB
 #undef NDIV
 #undef RNMX
-
-#undef OFST
-#undef KCOMP
-#undef KWVM
-/* end userwork */
+/* end random number generator */
 /* ========================================================================== */
 
 
