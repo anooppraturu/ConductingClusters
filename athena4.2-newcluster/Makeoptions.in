@@ -120,7 +120,7 @@ ifeq ($(MACHINE),macosx-mike)
 	MPIINC = -I/Users/mike/homebrew/include -I/usr/include/malloc
 	MPILIB = -L/Users/mike/homebrew/lib -lmpi
 	FFTWLIB = -L/Users/mike/homebrew/lib -lfftw3
-	FFTWINC = -I/Users/mike/homebrew/local/include
+	FFTWINC = -I/Users/mike/homebrew/include
 endif
 endif
 endif
