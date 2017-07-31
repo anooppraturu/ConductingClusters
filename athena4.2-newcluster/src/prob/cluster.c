@@ -589,11 +589,6 @@ void problem(DomainS *pDomain)
     }
   }
 
-   /* Add metal weighted r^2 to history dump */
-#if (NSCALARS > 0)
-   dump_history_enroll(Metal_r2, "<Metal_r2>");
-#endif
-
   /* interface magnetic field */
 #ifdef MHD
   generate();
@@ -757,6 +752,12 @@ static void set_vars(Real time)
     }
   }
 #endif /*MPI_PARALLEL*/
+
+
+  /* Add metal weighted r^2 to history dump */
+#if (NSCALARS > 0)
+  dump_history_enroll(Metal_r2, "<Metal_r2>");
+#endif
 
 
   return;
