@@ -543,25 +543,6 @@ void problem(DomainS *pDomain)
   profile_dump.num    = 0;
   profile_dump.out    = "prim";
   profile_dump.nlevel = -1;       /* dump all levels */
-  n_bins = MAX(Nx,Ny);
-  n_bins = MAX(n_bins,Nz) + 8.0;
-
-  /*Allocate and initialize array to hold profile data*/
-  profile_data = (Real**) calloc_2d_array(n_profiles, n_bins, sizeof(Real));
-  for(prof_index = 0; prof_index<n_profiles; prof_index++){
-     for(bin_index = 0; bin_index<n_bins; bin_index++){
-        profile_data[prof_index][bin_index] = 0.0;
-     }
-  }
-#ifdef MPI_PARALLEL
-  profile_data_global = (Real**) calloc_2d_array(n_profiles, n_bins, sizeof(Real));
-
-  for(prof_index = 0; prof_index<n_profiles; prof_index++){
-    for(bin_index = 0; bin_index<n_bins; bin_index++){
-      profile_data_global[prof_index][bin_index] = 0.0;
-    }
-  }
-#endif /*MPI_PARALLEL*/
 
   /* initialize gas variables on the grid */
   for (k=ks; k<=ke; k++) {
@@ -751,6 +732,32 @@ static void set_vars(Real time)
   if (2.0 * rvir >= rout){
     ath_error("[Userwork_in_loop]: virial radius exceeds domain size.\n");
   }
+
+
+
+  /* calculate the number of bins to output */
+  n_bins = MAX(pGrid->Nx[0], pGrid->Nx[1]);
+  n_bins = MAX(pGrid->Nx[2], n_bins);
+  n_bins += 8.0;
+
+
+  /*Allocate and initialize array to hold profile data*/
+  profile_data = (Real**) calloc_2d_array(n_profiles, n_bins, sizeof(Real));
+  for(prof_index = 0; prof_index<n_profiles; prof_index++){
+    for(bin_index = 0; bin_index<n_bins; bin_index++){
+      profile_data[prof_index][bin_index] = 0.0;
+    }
+  }
+#ifdef MPI_PARALLEL
+  profile_data_global = (Real**) calloc_2d_array(n_profiles, n_bins, sizeof(Real));
+
+  for(prof_index = 0; prof_index<n_profiles; prof_index++){
+    for(bin_index = 0; bin_index<n_bins; bin_index++){
+      profile_data_global[prof_index][bin_index] = 0.0;
+    }
+  }
+#endif /*MPI_PARALLEL*/
+
 
   return;
 }
