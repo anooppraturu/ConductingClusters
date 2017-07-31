@@ -1039,11 +1039,13 @@ static Real phi_nfw(const Real r)
 
 void problem_write_restart(MeshS *pM, FILE *fp)
 {
-  /*We're writing the address in memory of num, t and dt? Why?*/
+  /* write out num, t, and dt for our profile_dump output structure */
+  /* NOTE: problem_read_restart() must read these in precisely the
+     same way, in precisely the same order! */
   fwrite(&profile_dump.num, sizeof(int),   1, fp);
   fwrite(&profile_dump.t,   sizeof(Real),  1, fp);
   fwrite(&profile_dump.dt,  sizeof(Real),  1, fp);
-  /*Do I still need return?*/
+
   return;
 }
 
@@ -1053,7 +1055,7 @@ void problem_read_restart(MeshS *pM, FILE *fp)
 
   set_vars(pM->time);
 
-  /*Not sure what this does... not too worried about it*/
+  /* set up our output structure for profile_dump */
   profile_dump.n      = 100;
   profile_dump.out    = "prim";
   profile_dump.nlevel = -1;       /* dump all levels */
