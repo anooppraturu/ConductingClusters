@@ -1799,9 +1799,9 @@ static Real kappa_fun(const Real d, const Real T,
 {
   /* factor of 2 roughly makes tvir equal peak temp of profile */
   Real Tvir = m/(2.0*rvir);
-  /* Limit temperature to ~1.5 * times the virial temperature so that
+  /* Limit temperature to ~0.9 * times the virial temperature so that
      the hot gas around shocks doesn't kill us */
-  Real T1 = MIN(T, 1.5 * Tvir);	/* you have to calculate Tvir! */
+  Real T1 = MIN(T, 0.9 * Tvir);	/* you have to calculate Tvir! */
   return (1.039 * f_sp * pow(mu, 3.5) / mue * m15 * pow(T1, 2.5));
 }
 #endif  /* THERMAL_CONDUCTION */
