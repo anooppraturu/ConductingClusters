@@ -321,9 +321,9 @@ static void perturb(DomainS *pDomain)
   for (k=ks; k<=ke; k++) {
     for (j=js; j<=je; j++) {
       for (i=is; i<=ie; i++) {
-        A1[k][j][i] /= pow(10.0,Bstrength)*rms[0];
-        A2[k][j][i] /= pow(10.0,Bstrength)*rms[0];
-        A3[k][j][i] /= pow(10.0,Bstrength)*rms[0];
+        A1[k][j][i] /= 2.0*pow(10.0,Bstrength)*rms[0];
+        A2[k][j][i] /= 2.0*pow(10.0,Bstrength)*rms[0];
+        A3[k][j][i] /= 2.0*pow(10.0,Bstrength)*rms[0];
       }
     }
   }
