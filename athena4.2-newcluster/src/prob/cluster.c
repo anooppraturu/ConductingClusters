@@ -1463,23 +1463,23 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
       }
    }
 
-/* reduce arrays into prof_data_global, but only copy prof_data_global[9][*] back */
+/* reduce arrays into prof_data_global, but only copy prof_data_global[21][*] back */
 #ifdef MPI_PARALLEL
-   ierr = MPI_Allreduce(&profile_data[9][0], &profile_data_global[9][0], n_bins,
+   ierr = MPI_Allreduce(&profile_data[21][0], &profile_data_global[21][0], n_bins,
                         MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
    if(ierr)
       ath_error("[calc_profiles]: MPI_Allreduce returned error %d\n", ierr);
 
    for(bin_index=0; bin_index<n_bins; bin_index++){
-      profile_data[9][bin_index] = profile_data_global[9][bin_index];
+      profile_data[21][bin_index] = profile_data_global[21][bin_index];
    }
 #endif /* MPI_PARALLEL */
 
    /* Divide through by 0th row of array (num) to get proper averages, but again only for prof_data[9][*] */
    for(bin_index=0; bin_index<n_bins; bin_index++){
      if(profile_data[0][bin_index]!= 0.0){
-       profile_data[9][bin_index] /= profile_data[0][bin_index];
+       profile_data[21][bin_index] /= profile_data[0][bin_index];
      }
    }
 
