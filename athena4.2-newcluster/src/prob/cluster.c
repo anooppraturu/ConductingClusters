@@ -277,6 +277,7 @@ static inline void generate()
 
 static void perturb(DomainS *pDomain)
 {
+#ifdef MHD
   GridS *pGrid = pDomain->Grid;
   int i, is=pGrid->is, ie = pGrid->ie;
   int j, js=pGrid->js, je = pGrid->je;
@@ -433,6 +434,7 @@ static void perturb(DomainS *pDomain)
       }
     }
   }
+#endif /*MHD*/
   return;
 }
 
