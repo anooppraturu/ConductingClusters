@@ -1365,8 +1365,8 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
             /* Radial Momentum */
             profile_data[8][s] += W.d*(W.V1*x1 + W.V2*x2 + W.V3*x3)/r;
 
-            /* Mass weighted sound speed */
-            profile_data[9][s] += W.d*sqrt(W.P/W.d);
+            /* sound speed */
+            profile_data[9][s] += sqrt(W.P/W.d);
 
             /* Gravitational Potential */
             profile_data[10][s] += phi_nfw(r);
@@ -1472,8 +1472,8 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
 
             W = Cons_to_Prim(&(pGrid->U[k][j][i]));
 
-                 /* Convective Heat Flux*/
-                 profile_data[24][s] += W.d*(W.P/W.d - profile_data[4][s])*((W.V1*x1 + W.V2*x2 + W.V3*x3)/r - profile_data[7][s])*SQR(profile_data[2][s])/(pow(profile_data[9][s],3.0));
+                 /* rho dT dVr*/
+                 profile_data[24][s] += W.d*(W.P/W.d - profile_data[4][s])*((W.V1*x1 + W.V2*x2 + W.V3*x3)/r - profile_data[7][s]);
          }
       }
    }
@@ -1574,7 +1574,7 @@ void dump_profile(DomainS *pD, OutputS *pOut)
   col_cnt++;
   fprintf(pfile," [%d]=Pr", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=rho Cs", col_cnt);
+  fprintf(pfile," [%d]=Cs", col_cnt);
   col_cnt++;
   fprintf(pfile," [%d]=phi", col_cnt);
   col_cnt++;
@@ -1604,7 +1604,7 @@ void dump_profile(DomainS *pD, OutputS *pOut)
   col_cnt++;
   fprintf(pfile," [%d]=u(S15,Si14,O8)", col_cnt);
   col_cnt++;
-  fprintf(pfile," [%d]=Convective Flux", col_cnt);
+  fprintf(pfile," [%d]=rho dT dVr", col_cnt);
   col_cnt++;
 #ifdef MHD
   fprintf(pfile," [%d]=B^2", col_cnt);
