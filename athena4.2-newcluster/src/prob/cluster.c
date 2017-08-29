@@ -1055,7 +1055,11 @@ static Real hh(Real z1)
 static Real phi_nfw(const Real r)
 {
   Real x = r / rvir;
-  return (-1.0 * f * log(1 + c_nfw*x)/(c_nfw*x) * pow(10.0*h*m, 2.0/3.0));
+  Real fix;
+  /*Add term to potential from shock to turnaround in order to match delta phi fo shells falling from Rta~5Rvir*/
+  
+  fix = 0.446*(tanh(3.0*(x-1.9))+1.0);
+  return (-1.0 * f * log(1 + c_nfw*x)/(c_nfw*x) + fix ) * pow(10.0*h*m, 2.0/3.0);
 }
 /* ========================================================================== */
 
