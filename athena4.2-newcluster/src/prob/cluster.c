@@ -20,6 +20,9 @@
 #endif /* DOUBLE_PREC */
 #endif /* MPI_PARALLEL */
 
+
+#define REPORT_NANS
+
 /* ========================================================================== */
 /* Prototypes and Definitions */
 
@@ -192,6 +195,19 @@ static double ran2(long int *idum);
 /* ========================================================================== */
 
 
+/* ========================================================================== */
+/* add Ryan's ReportNANs() code */
+
+#ifdef REPORT_NANS
+static int report_nans(MeshS *pM, DomainS *pDomain, int fix);
+static OutputS nan_dump;
+static int nan_dump_count;
+#endif  /* REPORT_NANS */
+
+/* ========================================================================== */
+
+
+#ifdef MHD
 /* ========================================================================== */
 /* Before we get to the problem file, FFT functions for B */
 
@@ -566,6 +582,10 @@ void problem(DomainS *pDomain)
   profile_dump.num    = 0;
   profile_dump.out    = "prim";
   profile_dump.nlevel = -1;       /* dump all levels */
+
+#ifdef REPORT_NANS
+  nan_dump_count = 0;
+#endif
 
   /* initialize gas variables on the grid */
   for (k=ks; k<=ke; k++) {
@@ -1247,6 +1267,9 @@ void Userwork_in_loop(MeshS *pM)
   for (nl=0; nl<=(pM->NLevels)-1; nl++) {
     for (nd=0; nd<=(pM->DomainsPerLevel[nl])-1; nd++) {
       if (pM->Domain[nl][nd].Grid != NULL) {
+#ifdef REPORT_NANS
+        ntot = report_nans(pM, &(pM->Domain[nl][nd]));
+#endif
         inner_bc(&(pM->Domain[nl][nd]));
 
          /* check whether we need to do an output */
@@ -1941,4 +1964,138 @@ static Real scalar5(const GridS *pG, const int i, const int j, const int k)
 }
 #endif
 /* end slice outputs */
+/* ========================================================================== */
+
+
+
+/* ========================================================================== */
+/* Ryan's ReportNANs() function */
+
+#ifdef REPORT_NANS
+static int report_nans(MeshS *pM, DomainS *pDomain)
+{
+#ifndef ISOTHERMAL
+  int i, j, k;
+  int is,ie,js,je,ks,ke;
+  Real x1, x2, x3;
+  Real KE, rho, press, temp;
+  int nanpress=0, nanrho=0, nanv=0, nnan;   /* nan count */
+  #ifdef MHD
+  Real ME;
+  int nanmag=0;
+  int nmag=0;
+#endif  /* MHD */
+  Real scal[4];
+#ifdef MPI_PARALLEL
+  Real my_scal[4];
+  int ierr;
+#endif
+
+  GridS *pGrid = pDomain->Grid;
+
+  is = pGrid->is; ie = pGrid->ie;
+  js = pGrid->js; je = pGrid->je;
+  ks = pGrid->ks; ke = pGrid->ke;
+
+  for (k=ks; k<=ke; k++) {
+    for (j=js; j<=je; j++) {
+      for (i=is; i<=ie; i++) {
+        rho = pGrid->U[k][j][i].d;
+        cc_pos(pGrid,i,j,k,&x1,&x2,&x3);
+        KE = (SQR(pGrid->U[k][j][i].M1) +
+              SQR(pGrid->U[k][j][i].M2) +
+              SQR(pGrid->U[k][j][i].M3)) /
+          (2.0 * rho);
+
+        press = pGrid->U[k][j][i].E - KE;
+#ifdef MHD
+        ME = (SQR(pGrid->U[k][j][i].B1c) +
+              SQR(pGrid->U[k][j][i].B2c) +
+              SQR(pGrid->U[k][j][i].B3c)) * 0.5;
+        press -= ME;
+#endif  /* MHD */
+
+        press *= Gamma_1;
+        temp = press / rho;
+
+        if (press != press)
+          nanpress++;
+
+        if (rho != rho)
+          nanrho++;
+
+        if (pGrid->U[k][j][i].M1 != pGrid->U[k][j][i].M1)
+          nanv++;
+        if (pGrid->U[k][j][i].M2 != pGrid->U[k][j][i].M2)
+          nanv++;
+        if (pGrid->U[k][j][i].M3 != pGrid->U[k][j][i].M3)
+          nanv++;
+
+#ifdef MHD
+        if (ME != ME)
+          nanmag++;
+#endif  /* MHD */
+      }
+    }
+  }
+
+  /* synchronize over grids */
+#ifdef MPI_PARALLEL
+  my_scal[0] = nanpress;
+  my_scal[1] = nanrho;
+  my_scal[2] = nanv;
+#ifdef MHD
+  my_scal[3] = nanmag;
+#endif  /* MHD */
+
+  ierr = MPI_Allreduce(&my_scal, &scal, 4, MPI_RL, MPI_SUM, MPI_COMM_WORLD);
+  if (ierr)
+    ath_error("[report_nans]: MPI_Allreduce returned error %d\n", ierr);
+
+  nanpress = scal[0];
+  nanrho   = scal[1];
+  nanv     = scal[2];
+#ifdef MHD
+  nanmag   = scal[3];
+#endif  /* MHD */
+#endif  /* MPI_PARALLEL */
+
+
+  /* sum up the # of bad cells and report */
+  nnan = nanpress+nanrho+nanv;
+
+#ifdef MHD
+  nnan += nanmag;
+#endif  /* MHD */
+
+  if (nnan > 0 ){
+#ifdef MHD
+    ath_pout(0, "[report_nans]: found %d nan cells: %d P, %d d, %d v, %d B.\n",
+             nnan, nanpress, nanrho, nanv, nanmag);
+#else
+    ath_pout(0, "[report_nans]: found %d nan cells: %d P, %d d, %d v.\n",
+             nnan, nanpress, nanrho, nanv);
+#endif  /* MHD */
+
+
+    nan_dump.n      = 100;
+    nan_dump.dt     = HUGE_NUMBER;
+    nan_dump.t      = pM->time;
+    nan_dump.num    = 1000 + nan_dump_count;
+    nan_dump.out    = "prim";
+    nan_dump.nlevel = -1;       /* dump all levels */
+
+
+    dump_vtk(pM, &nan_dump);
+    if(nnan) nan_dump_count++;
+    if (nan_dump_count > 10)
+      ath_error("[report_nans]: too many nan'd timesteps.\n");
+  }
+
+
+#endif  /* ISOTHERMAL */
+
+  return nnan;
+}
+#endif  /* REPORT_NANS */
 /* ========================================================================== */
