@@ -753,7 +753,7 @@ static void set_vars(Real time)
 
   rvir = pow(m, 1.0/3.0) * pow(10.0*h, -2.0/3.0);
   if (2.0 * rvir >= rout){
-    ath_error("[Userwork_in_loop]: virial radius exceeds domain size.\n");
+    ath_error("[set_vars]: virial radius exceeds domain size.\n");
   }
 
 
@@ -1067,7 +1067,7 @@ static Real phi_nfw(const Real r)
   Real fix;
   Real phi_pot;
   /*Add term to potential from shock to turnaround in order to match delta phi fo shells falling from Rta~5Rvir*/
-  
+
   fix = 2.35964*SQR(x-1.5);
   phi_pot = (-1.0 * f * log(1 + c_nfw*x)/(c_nfw*x)) * pow(10.0*h*m, 2.0/3.0);
 
@@ -1895,13 +1895,13 @@ static Real omega(const GridS *pG, const int i, const int j, const int k)
    Real omx, omy, omz;
 
    omz = (pG->U[k][j][i+1].M2/pG->U[k][j][i+1].d - pG->U[k][j][i-1].M2/pG->U[k][j][i-1].d)/(2.0*pG->dx1)
-	- (pG->U[k][j+1][i].M1/pG->U[k][j+1][i].d - pG->U[k][j-1][i].M1/pG->U[k][j-1][i].d)/(2.0*pG->dx2);
+        - (pG->U[k][j+1][i].M1/pG->U[k][j+1][i].d - pG->U[k][j-1][i].M1/pG->U[k][j-1][i].d)/(2.0*pG->dx2);
 
    omy = (pG->U[k+1][j][i].M1/pG->U[k+1][j][i].d - pG->U[k-1][j][i].M1/pG->U[k-1][j][i].d)/(2.0*pG->dx3)
-	- (pG->U[k][j][i+1].M3/pG->U[k][j][i+1].d - pG->U[k][j][i-1].M3/pG->U[k][j][i-1].d)/(2.0*pG->dx1);
+        - (pG->U[k][j][i+1].M3/pG->U[k][j][i+1].d - pG->U[k][j][i-1].M3/pG->U[k][j][i-1].d)/(2.0*pG->dx1);
 
    omx = (pG->U[k][j+1][i].M3/pG->U[k][j+1][i].d - pG->U[k][j-1][i].M3/pG->U[k][j-1][i].d)/(2.0*pG->dx2)
-	- (pG->U[k+1][j][i].M2/pG->U[k+1][j][i].d - pG->U[k-1][j][i].M2/pG->U[k-1][j][i].d)/(2.0*pG->dx3);
+        - (pG->U[k+1][j][i].M2/pG->U[k+1][j][i].d - pG->U[k-1][j][i].M2/pG->U[k-1][j][i].d)/(2.0*pG->dx3);
 
    return sqrt(SQR(omx) + SQR(omy) + SQR(omz));
 }
