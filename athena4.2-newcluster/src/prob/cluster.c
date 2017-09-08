@@ -141,7 +141,8 @@ static Real scalar3(const GridS *pG, const int i, const int j, const int k);
 static Real scalar4(const GridS *pG, const int i, const int j, const int k);
 static Real scalar5(const GridS *pG, const int i, const int j, const int k);
 #endif
-
+/*Vorticity*/
+static Real omega( const GridS *pG, const int i, const int j, const int k);
 
 /* FFT prototypes */
 /* ------------------------------------------------------------------------ */
@@ -1133,8 +1134,9 @@ void problem_read_restart(MeshS *pM, FILE *fp)
 
 ConsFun_t get_usr_expr(const char *expr)
 {
+   if(strcmp(expr, "Vorticity")==0) return omega;
 #if (NSCALARS > 0)
-   if(strcmp(expr, "metals")==0) return metals;
+   else if(strcmp(expr, "metals")==0) return metals;
 #endif
 #if (NSCALARS == 6)
    else if(strcmp(expr, "s1")==0) return scalar1;
@@ -1887,6 +1889,23 @@ static Real hst_metal_r2(const GridS *pG, const int i, const int j, const int k)
 
 
 /* ========================================================================== */
+/*Vorticity output*/
+static Real omega(const GridS *pG, const int i, const int j, const int k)
+{
+   Real omx, omy, omz;
+
+   omz = (pG->U[k][j][i+1].M2/pG->U[k][j][i+1].d - pG->U[k][j][i-1].M2/pG->U[k][j][i-1].d)/(2.0*pG->dx1)
+	- (pG->U[k][j+1][i].M1/pG->U[k][j+1][i].d - pG->U[k][j-1][i].M1/pG->U[k][j-1][i].d)/(2.0*pG->dx2);
+
+   omy = (pG->U[k+1][j][i].M1/pG->U[k+1][j][i].d - pG->U[k-1][j][i].M1/pG->U[k-1][j][i].d)/(2.0*pG->dx3)
+	- (pG->U[k][j][i+1].M3/pG->U[k][j][i+1].d - pG->U[k][j][i-1].M3/pG->U[k][j][i-1].d)/(2.0*pG->dx1);
+
+   omx = (pG->U[k][j+1][i].M3/pG->U[k][j+1][i].d - pG->U[k][j-1][i].M3/pG->U[k][j-1][i].d)/(2.0*pG->dx2)
+	- (pG->U[k+1][j][i].M2/pG->U[k+1][j][i].d - pG->U[k-1][j][i].M2/pG->U[k-1][j][i].d)/(2.0*pG->dx3);
+
+   return sqrt(SQR(omx) + SQR(omy) + SQR(omz));
+}
+
 /* dye outputs for slice plots */
 #if (NSCALARS > 0)
 static Real metals(const GridS *pG, const int i, const int j, const int k)
