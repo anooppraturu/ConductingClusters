@@ -1057,10 +1057,14 @@ static Real phi_nfw(const Real r)
 {
   Real x = r / rvir;
   Real fix;
+  Real phi_pot;
   /*Add term to potential from shock to turnaround in order to match delta phi fo shells falling from Rta~5Rvir*/
   
-  fix = 0.446*(tanh(3.0*(x-1.9))+1.0);
-  return (-1.0 * f * log(1 + c_nfw*x)/(c_nfw*x) + fix ) * pow(10.0*h*m, 2.0/3.0);
+  fix = 2.35964*SQR(x-1.5);
+  phi_pot = (-1.0 * f * log(1 + c_nfw*x)/(c_nfw*x)) * pow(10.0*h*m, 2.0/3.0);
+
+  if (x >= 1.5) return (phi_pot + fix);
+  else return phi_pot;
 }
 /* ========================================================================== */
 
