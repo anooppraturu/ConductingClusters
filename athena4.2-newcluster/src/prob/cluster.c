@@ -144,6 +144,7 @@ static Real scalar5(const GridS *pG, const int i, const int j, const int k);
 /*Vorticity*/
 static Real omega( const GridS *pG, const int i, const int j, const int k);
 
+#ifdef MHD
 /* FFT prototypes */
 /* ------------------------------------------------------------------------ */
 
@@ -184,7 +185,7 @@ static void initialize(GridS *pGrid, DomainS *pD);
 
 /* Function prototypes for Numerical Recipes functions */
 static double ran2(long int *idum);
-
+#endif  /* MHD */
 
 
 /* end prototypes and definitions */
@@ -502,6 +503,7 @@ static void initialize(GridS *pGrid, DomainS *pD)
 
   return;
 }
+#endif  /* MHD */
 
 /* Create the initial condition and start the simulation! */
 void problem(DomainS *pDomain)
@@ -527,11 +529,13 @@ void problem(DomainS *pDomain)
 #endif
 
   /* Ensure a different initial random seed for each process in an MPI calc. */
+#ifdef MHD
   rseed = -11;
 #ifdef MPI_PARALLEL
   rseed -= myID_Comm_world;
 #endif
   initialize(pGrid, pDomain);
+#endif  /* MHD */
 
   set_vars(pGrid->time);
 
@@ -613,6 +617,10 @@ void problem(DomainS *pDomain)
   generate();
 
   perturb(pDomain);
+
+  if (A1 != NULL) free_3d_array((void***) A1);
+  if (A2 != NULL) free_3d_array((void***) A2);
+  if (A3 != NULL) free_3d_array((void***) A3);
 #endif  /* MHD */
 
 
@@ -1124,15 +1132,6 @@ void problem_read_restart(MeshS *pM, FILE *fp)
   }
 #endif /* MPI_PARALLEL */
 
-  /* Free Athena-style arrays */
-  free_3d_array(A1);
-  free_3d_array(A2);
-  free_3d_array(A3);
-
-  /* Free FFTW-style arrays */
-  ath_3d_fft_free(fA1);
-  ath_3d_fft_free(fA2);
-  ath_3d_fft_free(fA3);
   return;
 }
 
@@ -1692,9 +1691,6 @@ void Userwork_after_loop(MeshS *pM)
 
   /* free memory if necessary */
   if (profile_data != NULL) free_2d_array((void**) profile_data);
-  if (A1 != NULL) free_3d_array((void***) A1);
-  if (A2 != NULL) free_3d_array((void***) A2);
-  if (A3 != NULL) free_3d_array((void***) A3);
 
 #ifdef MPI_PARALLEL
   if (profile_data_global != NULL) free_2d_array((void**) profile_data_global);
