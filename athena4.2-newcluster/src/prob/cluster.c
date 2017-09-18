@@ -36,6 +36,7 @@ static Real mu=0.62, mue=1.17;
 static Real m15;
 static int cooling=0;
 static Real mytanh(const Real x);
+static Real compress(const Real x);
 
 /* Cosmology */
 /* -------------------------------------------------------------------------- */
@@ -1084,15 +1085,9 @@ static Real hh(Real z1)
 static Real phi_nfw(const Real r)
 {
   Real x = r / rvir;
-  Real fix;
-  Real phi_pot;
-  /*Add term to potential from shock to turnaround in order to match delta phi fo shells falling from Rta~5Rvir*/
 
-  fix = 2.35964*SQR(x-1.5);
-  phi_pot = (-1.0 * f * log(1 + c_nfw*x)/(c_nfw*x)) * pow(10.0*h*m, 2.0/3.0);
+  return (-1.0 * f * log(1 + c_nfw*x)/(c_nfw*x)) * pow(10.0*h*m, 2.0/3.0);
 
-  if (x >= 1.5) return (phi_pot + fix);
-  else return phi_pot;
 }
 /* ========================================================================== */
 
@@ -1814,6 +1809,11 @@ static Real mytanh(const Real x)
   return 0.5 * (1.0 + tanh(x));
 }
 
+static Real compress(const Real x)
+{
+  return x * 0.5 * (tanh(10.0*x)+tanh(10.0* (1.8-x) )) + (x + 1.6) * (0.7/0.5) * mytanh(10.0*(x-1.8)); 
+}
+
 /* Use static variables M and rvir in the potential */
 static Real grav_pot(const Real x1, const Real x2, const Real x3, const Real time)
 {
@@ -1827,8 +1827,8 @@ static Real grav_pot(const Real x1, const Real x2, const Real x3, const Real tim
 
   width = 10.0/r_switch;
 
-  phi_in  = phi_nfw(r);
-  phi_out = phi_nfw(r_switch);  /* phi = const at large radii */
+  phi_in  = phi_nfw(compress(r));
+  phi_out = phi_nfw(compress(r_switch));  /* phi = const at large radii */
 
   /* interpolate between phi_in and phi_out */
   phi_tot = phi_in  * mytanh(width * (r_switch-r)) +
