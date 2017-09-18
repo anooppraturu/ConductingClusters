@@ -21,7 +21,7 @@
 #endif /* MPI_PARALLEL */
 
 
-#define REPORT_NANS
+/* #define REPORT_NANS */
 
 /* ========================================================================== */
 /* Prototypes and Definitions */
@@ -199,7 +199,7 @@ static double ran2(long int *idum);
 /* add Ryan's ReportNANs() code */
 
 #ifdef REPORT_NANS
-static int report_nans(MeshS *pM, DomainS *pDomain, int fix);
+static int report_nans(MeshS *pM, DomainS *pDomain);
 static OutputS nan_dump;
 static int nan_dump_count;
 #endif  /* REPORT_NANS */
@@ -1240,7 +1240,7 @@ static void inner_bc(DomainS *pDomain)
 /* calculate rho and T at the turnaround radius and call inner_bc() */
 void Userwork_in_loop(MeshS *pM)
 {
-  int nl, nd;
+  int nl, nd, ntot;
 #ifdef MPI_PARALLEL
   int ierr;
 #endif	/* MPI_PARALLEL */
