@@ -1131,23 +1131,6 @@ void problem_read_restart(MeshS *pM, FILE *fp)
   fread(&profile_dump.t,   sizeof(Real),  1, fp);
   fread(&profile_dump.dt,  sizeof(Real),  1, fp);
 
-/* REMOVE IF THIS FIXES THE BUG --- */ 
-  /* Allocate and initialize array to hold profile data */
- /* profile_data = (Real**)calloc_2d_array(n_bins, n_profiles, sizeof(Real));
-  for(prof_index = 0; prof_index<n_profiles; prof_index++){
-     for(bin_index = 0; bin_index<n_bins; bin_index++){
-        profile_data[prof_index][bin_index] = 0.0;
-     }
-  }
-#ifdef MPI_PARALLEL
-  profile_data_global = (Real**) calloc_2d_array(n_bins, n_profiles, sizeof(Real));
-  for(prof_index = 0; prof_index<n_profiles; prof_index++){
-     for(bin_index = 0; bin_index<n_bins; bin_index++){
-        profile_data_global[prof_index][bin_index] = 0.0;
-     }
-  }
-#endif */ /* MPI_PARALLEL */
-
   return;
 }
 
