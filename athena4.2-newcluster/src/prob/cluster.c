@@ -95,10 +95,13 @@ static int n_bins;
      num, radius,
 
    thermodynamic variables:
-     P, rho, T, K, Mach, Vr, Metals, Pr, mass weighted Cs, phi
+     P, rho, T, K, Mach, Vr, Metals, Pr, Cs, phi
 
-   bremstrahlung and clumping factor:
+   bremsstrahlung and clumping factor:
      Brem, rho^2,
+
+   instability growth:
+     dT/T, drho/rho,
 
    line luminosity:
      Fe23, Fe24, Fe25, Fe26, (S15, Si14, O8),
@@ -110,9 +113,9 @@ static int n_bins;
      Convective Heat Flux, B^2, beta, Br, Alfven_Mach
 */
 #ifndef MHD
-const int n_profiles = 25;
+const int n_profiles = 27;
 #else
-const int n_profiles = 29;
+const int n_profiles = 31;
 #endif /* MHD */
 
 #ifdef MPI_PARALLEL
@@ -1118,8 +1121,6 @@ void problem_write_restart(MeshS *pM, FILE *fp)
 
 void problem_read_restart(MeshS *pM, FILE *fp)
 {
-  int prof_index,bin_index;
-
   set_vars(pM->time);
 
   /* set up our output structure for profile_dump */
@@ -1391,48 +1392,48 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
 
 #if (NSCALARS>0)
             /* Fe23 */
-            profile_data[14][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d, -3.04);
+            profile_data[16][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d, -3.04);
 
             /* Fe24 */
-            profile_data[15][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d, -1.23);
+            profile_data[17][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d, -1.23);
 
             /* Fe25 */
-            profile_data[16][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d, 0.2);
+            profile_data[18][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d, 0.2);
 
             /* Fe26 */
-            profile_data[17][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d, 2.41);
+            profile_data[19][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d, 2.41);
 
             /* Assorted (S15, Si14, O8) */
-            profile_data[18][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d, -1.46);
+            profile_data[20][s] += pGrid->U[k][j][i].s[0]*SQR(W.d)*pow(W.P/W.d, -1.46);
 #endif
 
             /* uFe23 */
-            profile_data[19][s] += SQR(W.d)*pow(W.P/W.d, -3.04);
+            profile_data[21][s] += SQR(W.d)*pow(W.P/W.d, -3.04);
 
             /* uFe24 */
-            profile_data[20][s] += SQR(W.d)*pow(W.P/W.d, -1.23);
+            profile_data[22][s] += SQR(W.d)*pow(W.P/W.d, -1.23);
 
             /* uFe25 */
-            profile_data[21][s] += SQR(W.d)*pow(W.P/W.d, 0.2);
+            profile_data[23][s] += SQR(W.d)*pow(W.P/W.d, 0.2);
 
             /* uFe26 */
-            profile_data[22][s] += SQR(W.d)*pow(W.P/W.d, 2.41);
+            profile_data[24][s] += SQR(W.d)*pow(W.P/W.d, 2.41);
 
             /* uAssorted (S15, Si14, O8) */
-            profile_data[23][s] += SQR(W.d)*pow(W.P/W.d, -1.46);
+            profile_data[25][s] += SQR(W.d)*pow(W.P/W.d, -1.46);
 #ifdef MHD
             /* B^2 */
-            profile_data[25][s] += SQR(W.B1c) + SQR(W.B2c) + SQR(W.B3c);
+            profile_data[27][s] += SQR(W.B1c) + SQR(W.B2c) + SQR(W.B3c);
 
             /* beta */
-            profile_data[26][s] += 2.0*W.P/(SQR(W.B1c) + SQR(W.B2c) +
+            profile_data[28][s] += 2.0*W.P/(SQR(W.B1c) + SQR(W.B2c) +
             SQR(W.B3c));
 
             /* Br */
-            profile_data[27][s] += (W.B1c*x1 + W.B2c*x2 + W.B3c*x3)/r;
+            profile_data[29][s] += (W.B1c*x1 + W.B2c*x2 + W.B3c*x3)/r;
 
             /* Alfven Mach Number squared */
-            profile_data[28][s] += W.d*(SQR(W.V1)  + SQR(W.V2)  + SQR(W.V3))
+            profile_data[30][s] += W.d*(SQR(W.V1)  + SQR(W.V2)  + SQR(W.V3))
                                       /(SQR(W.B1c) + SQR(W.B2c) + SQR(W.B3c));
 #endif /* MHD */
          }
@@ -1440,7 +1441,7 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
    }
 
 
-/* Note that since prof_data[24][*] is still 0, so too will prof_data_global[24][*] */
+/* Note that since prof_data[14,15,26][*] is still 0, so too will prof_data_global[14,15,26][*] */
 #ifdef MPI_PARALLEL
    ierr = MPI_Allreduce(&profile_data[0][0], &profile_data_global[0][0], n_bins*n_profiles,
                         MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
@@ -1466,7 +1467,7 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
      }
    }
 
-   /* Now that we have averages of T and Vr on the shell, go back and calculate convective heat fluxes */
+   /* Now that we have averages of T and Vr on the shell, go back and calculate convective heat fluxes, as well as temperature and density fluctuations */
    for(k=ks; k<=ke; k++){
       for(j=js; j<=je; j++){
          for(i=is; i<=ie; i++){
@@ -1479,29 +1480,38 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
 
             W = Cons_to_Prim(&(pGrid->U[k][j][i]));
 
+                 /* dT/T */
+                 profile_data[14][s] += (W.P/W.d - profile_data[4][s])/(profile_data[4][s]);
+
+                 /* drho/rho */
+                 profile_data[15][s] += (W.d - profile_data[2][s])/(profile_data[2][s]);
+
                  /* rho dT dVr*/
-                 profile_data[24][s] += W.d*(W.P/W.d - profile_data[4][s])*((W.V1*x1 + W.V2*x2 + W.V3*x3)/r - profile_data[7][s]);
+                 profile_data[26][s] += W.d*(W.P/W.d - profile_data[4][s])*((W.V1*x1 + W.V2*x2 + W.V3*x3)/r - profile_data[7][s]);
          }
       }
    }
 
-/* reduce arrays into prof_data_global, but only copy prof_data_global[24][*] back */
+/* reduce arrays into prof_data_global, only copy back [14,15,26]*/
 #ifdef MPI_PARALLEL
-   ierr = MPI_Allreduce(&profile_data[24][0], &profile_data_global[24][0], n_bins,
+   ierr = MPI_Allreduce(&profile_data[0][0], &profile_data_global[0][0], n_bins,
                         MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-
    if(ierr)
       ath_error("[calc_profiles]: MPI_Allreduce returned error %d\n", ierr);
 
    for(bin_index=0; bin_index<n_bins; bin_index++){
-      profile_data[24][bin_index] = profile_data_global[24][bin_index];
+      profile_data[14][bin_index] = profile_data_global[14][bin_index];
+      profile_data[15][bin_index] = profile_data_global[15][bin_index];
+      profile_data[26][bin_index] = profile_data_global[26][bin_index];
    }
 #endif /* MPI_PARALLEL */
 
-   /* Divide through by 0th row of array (num) to get proper averages, but again only for prof_data[24][*] */
+   /* Divide through by 0th row of array (num) to get proper averages, but again only for prof_data[14,15,26][*] */
    for(bin_index=0; bin_index<n_bins; bin_index++){
      if(profile_data[0][bin_index]!= 0.0){
-       profile_data[24][bin_index] /= profile_data[0][bin_index];
+       profile_data[14][bin_index] /= profile_data[0][bin_index];
+       profile_data[15][bin_index] /= profile_data[0][bin_index];
+       profile_data[26][bin_index] /= profile_data[0][bin_index];
      }
    }
 
@@ -1591,6 +1601,10 @@ void dump_profile(DomainS *pD, OutputS *pOut)
   col_cnt++;
   fprintf(pfile," [%d]=rho^2", col_cnt);
   col_cnt++;
+  fprintf(pfile," [%d]=dT/T", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=drho/rho", col_cnt);
+  col_cnt++;
   fprintf(pfile," [%d]=Fe23", col_cnt);
   col_cnt++;
   fprintf(pfile," [%d]=Fe24", col_cnt);
@@ -1656,11 +1670,13 @@ void dump_profile(DomainS *pD, OutputS *pOut)
     fprintf(pfile, fmt, profile_data[22][c]);
     fprintf(pfile, fmt, profile_data[23][c]);
     fprintf(pfile, fmt, profile_data[24][c]);
-#ifdef MHD
     fprintf(pfile, fmt, profile_data[25][c]);
     fprintf(pfile, fmt, profile_data[26][c]);
+#ifdef MHD
     fprintf(pfile, fmt, profile_data[27][c]);
     fprintf(pfile, fmt, profile_data[28][c]);
+    fprintf(pfile, fmt, profile_data[29][c]);
+    fprintf(pfile, fmt, profile_data[30][c]);
 #endif /* MHD */
 
     fprintf(pfile,"\n");
