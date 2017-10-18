@@ -1557,7 +1557,7 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
 
 /* reduce arrays into prof_data_global, only copy back [14,15,26]*/
 #ifdef MPI_PARALLEL
-   ierr = MPI_Allreduce(&profile_data[0][0], &profile_data_global[0][0], n_bins,
+   ierr = MPI_Allreduce(&profile_data[0][0], &profile_data_global[0][0], n_bins*n_profiles,
                         MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
    if(ierr)
       ath_error("[calc_profiles]: MPI_Allreduce returned error %d\n", ierr);
