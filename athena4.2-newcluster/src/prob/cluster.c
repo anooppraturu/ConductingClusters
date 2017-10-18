@@ -125,6 +125,40 @@ static Real **profile_data_global;
 static void calc_profiles(DomainS *pDomain, Real **profile_data);
 
 
+/* Making projected profiles*/
+/* -------------------------------------------------------------------------- */
+void dump_proj_x(DomainS *pD, OutputS *pOut);
+void dump_proj_y(DomainS *pD, OutputS *pOut);
+void dump_proj_z(DomainS *pD, OutputS *pOut);
+
+
+static Real **proj_data_x;
+static Real **proj_data_y;
+static Real **proj_data_z;
+/* 3 x Each variable for each direction of projection*/
+/* radial coordinates:
+ *   num, l.o.s. length, (projected) radius, luminosity
+ *   
+ * thermodynamic variables:
+ *   P, rho, T, K, Cs
+ *
+ * bremsstrahlung and clumping factor:
+ *   Brem, rho^2
+ *
+ * line luminosity assuming uniform metallicity:
+ *   uFe23, uFe24, uFe25, uFe26, u(S15, Si14, O8)
+ * */
+const int np_profiles = 16;
+
+#ifdef MPI_PARALLEL
+static Real **proj_data_global_x;
+static Real **proj_data_global_y;
+static Real **proj_data_global_z;
+#endif /* MPI_PARALLEL */
+
+static void calc_projected(DomainS *pDomain);
+
+
 /* Hisory Dump Stuff */
 /* ------------------------------------------------------------------------ */
 static Real hst_redshift(const GridS *pG, const int i, const int j, const int k);
@@ -809,6 +843,31 @@ static void set_vars(Real time)
 #endif /* MPI_PARALLEL */
 
 
+  /* Allocate and initialize array to hold projected data */
+  proj_data_x = (Real**) calloc_2d_array(np_profiles, n_bins, sizeof(Real));
+  proj_data_y = (Real**) calloc_2d_array(np_profiles, n_bins, sizeof(Real));
+  proj_data_z = (Real**) calloc_2d_array(np_profiles, n_bins, sizeof(Real));
+  for(prof_index = 0; prof_index<np_profiles; prof_index++){
+    for(bin_index = 0; bin_index<n_bins; bin_index++){
+      proj_data_x[prof_index][bin_index] = 0.0;
+      proj_data_y[prof_index][bin_index] = 0.0;
+      proj_data_z[prof_index][bin_index] = 0.0;
+    }
+  }
+#ifdef MPI_PARALLEL
+  proj_data_global_x = (Real**) calloc_2d_array(np_profiles, n_bins, sizeof(Real));
+  proj_data_global_y = (Real**) calloc_2d_array(np_profiles, n_bins, sizeof(Real));
+  proj_data_global_z = (Real**) calloc_2d_array(np_profiles, n_bins, sizeof(Real));
+
+  for(prof_index = 0; prof_index<np_profiles; prof_index++){
+    for(bin_index = 0; bin_index<n_bins; bin_index++){
+      proj_data_global_x[prof_index][bin_index] = 0.0;
+      proj_data_global_y[prof_index][bin_index] = 0.0;
+      proj_data_global_z[prof_index][bin_index] = 0.0;
+    }
+  }
+#endif /* MPI_PARALLEL */
+
   /* enroll extra outputs in the history dump */
   dump_history_enroll(hst_redshift, "redshift");
   dump_history_enroll(hst_halomass, "halo mass");
@@ -1258,14 +1317,18 @@ void Userwork_in_loop(MeshS *pM)
             /* first, update output time */
             profile_dump.t += profile_dump.dt;
 
-            /* next, calculate the radial profiles and store them in the global array */
+            /* next, calculate radial and projected profiles and store them in the global array */
             calc_profiles(&(pM->Domain[nl][nd]), profile_data);
+	    calc_projected(&(pM->Domain[nl][nd]));
 
             /* finally, write the data to disk, but only on the root process */
 #ifdef MPI_PARALLEL
             if (myID_Comm_world == 0){
 #endif /* MPI_PARALLEL */
                dump_profile(&(pM->Domain[nl][nd]), &profile_dump);
+	       dump_proj_x(&(pM->Domain[nl][nd]), &profile_dump);
+	       dump_proj_y(&(pM->Domain[nl][nd]), &profile_dump);
+	       dump_proj_z(&(pM->Domain[nl][nd]), &profile_dump);
 #ifdef MPI_PARALLEL
             }
 #endif /* MPI_PARALLEL */
@@ -1521,6 +1584,217 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
 }
 
 
+/* Function to make projected profiles of grid quantities*/
+static void calc_projected(DomainS *pDomain)
+{
+   int nl, nd;
+   GridS *pGrid = pDomain->Grid;
+   int is, ie, js, je, ks, ke;
+   int i, j, k, sx, sy, sz;
+   double rx, ry, rz, filter;
+
+   int prof_index;
+
+   int profile_index=0, bin_index=0;
+
+   Real x1, x2, x3, dx1;
+
+   /* assume cubic cells! */
+   dx1 = pDomain->dx[1];
+
+
+#ifdef MPI_PARALLEL
+   int ierr;
+#endif /* MPI_PARALLEL */
+
+   PrimS W;
+   ConsS U;
+
+   is = pGrid->is; ie=pGrid->ie;
+   js = pGrid->js; je=pGrid->je;
+   ks = pGrid->ks; ke=pGrid->ke;
+
+
+   /* start out by zeroing profile arrays */
+   for(prof_index = 0; prof_index<np_profiles; prof_index++){
+      for(bin_index = 0; bin_index<n_bins; bin_index++){
+         proj_data_x[prof_index][bin_index] = 0.0;
+         proj_data_y[prof_index][bin_index] = 0.0;
+         proj_data_z[prof_index][bin_index] = 0.0;
+      }
+   }
+
+#ifdef MPI_PARALLEL
+   for(prof_index = 0; prof_index<np_profiles; prof_index++){
+      for(bin_index = 0; bin_index<n_bins; bin_index++){
+         proj_data_global_x[prof_index][bin_index] = 0.0;
+         proj_data_global_y[prof_index][bin_index] = 0.0;
+         proj_data_global_z[prof_index][bin_index] = 0.0;
+      }
+   }
+#endif /* MPI_PARALLEL */
+
+   for(k=ks; k<=ke; k++){
+      for(j=js; j<=je; j++){
+         for(i=is; i<=ie; i++){
+           /* calculate radius in cell coordinates and corresponding index */
+           cc_pos(pGrid,i,j,k,&x1,&x2,&x3);
+           rx = sqrt(x2*x2 + x3*x3);
+           ry = sqrt(x1*x1 + x3*x3);
+           rz = sqrt(x1*x1 + x2*x2);
+
+	   /* apply circlular filter of size rta so birghtness of IGM doesnt contribute to projected profiles */
+	   if(sqrt(x1*x1 + x2*x2 + x3*x3) <= 2.0*rvir) {
+	      filter = 1.0;
+	   }
+	   else {
+	      filter = 0.0;
+	   }
+
+            /* FIX ME: Make binning more accurate */
+            sx = (int) floor(rx/dx1);
+            sy = (int) floor(ry/dx1);
+            sz = (int) floor(rz/dx1);
+
+            W = Cons_to_Prim(&(pGrid->U[k][j][i]));
+
+            /* 0,1,2 contains number of bins correspinding to a given s for x,y,z respectively */
+	    if(x1 == dx1/2.0){
+		proj_data_x[0][sx] += 1.0;
+	    }
+	    if(x2 == dx1/2.0){
+		proj_data_y[0][sy] += 1.0;
+	    }
+	    if(x3 == dx1/2.0){
+		proj_data_z[0][sz] += 1.0;
+	    }
+
+	    /* Length of line of sight in bins */
+	    proj_data_x[1][sx] += 1.0;
+	    proj_data_y[1][sy] += 1.0;
+	    proj_data_z[1][sz] += 1.0;
+
+            /* avg R_proj corresponding to a given s */
+            proj_data_x[2][sx] += rx;
+            proj_data_y[2][sy] += ry;
+            proj_data_z[2][sz] += rz;
+
+            /* Luminosity */
+            proj_data_x[3][sx] += filter * cool(W.d, W.P, 0.0);
+            proj_data_y[3][sy] += filter * cool(W.d, W.P, 0.0);
+            proj_data_z[3][sz] += filter * cool(W.d, W.P, 0.0);
+
+            /* density */
+            proj_data_x[4][sx] += filter * W.d * cool(W.d, W.P, 0.0);
+            proj_data_y[4][sy] += filter * W.d * cool(W.d, W.P, 0.0);
+            proj_data_z[4][sz] += filter * W.d * cool(W.d, W.P, 0.0);
+
+            /* pressure */
+            proj_data_x[5][sx] += filter * W.P * cool(W.d, W.P, 0.0);
+            proj_data_y[5][sy] += filter * W.P * cool(W.d, W.P, 0.0);
+            proj_data_z[5][sz] += filter * W.P * cool(W.d, W.P, 0.0);
+
+            /* temperature */
+            proj_data_x[6][sx] += filter * W.P/W.d * cool(W.d, W.P, 0.0);
+            proj_data_y[6][sy] += filter * W.P/W.d * cool(W.d, W.P, 0.0);
+            proj_data_z[6][sz] += filter * W.P/W.d * cool(W.d, W.P, 0.0);
+
+            /* Entropy */
+            proj_data_x[7][sx] += filter * W.P / pow(W.d,5.0/3.0) * cool(W.d, W.P, 0.0);
+            proj_data_y[7][sy] += filter * W.P / pow(W.d,5.0/3.0) * cool(W.d, W.P, 0.0);
+            proj_data_z[7][sz] += filter * W.P / pow(W.d,5.0/3.0) * cool(W.d, W.P, 0.0);
+
+            /* sound speed */
+            proj_data_x[8][sx] += filter * sqrt(W.P/W.d) * cool(W.d, W.P, 0.0);
+            proj_data_y[8][sy] += filter * sqrt(W.P/W.d) * cool(W.d, W.P, 0.0);
+            proj_data_z[8][sz] += filter * sqrt(W.P/W.d) * cool(W.d, W.P, 0.0);
+
+            /* Bremsstrahlung Emissivity */
+            proj_data_x[9][sx] += filter * SQR(W.d)*sqrt(W.P/W.d);
+            proj_data_y[9][sy] += filter * SQR(W.d)*sqrt(W.P/W.d);
+            proj_data_z[9][sz] += filter * SQR(W.d)*sqrt(W.P/W.d);
+
+            /* density squared */
+            proj_data_x[10][sx] += filter * SQR(W.d);
+            proj_data_y[10][sy] += filter * SQR(W.d);
+            proj_data_z[10][sz] += filter * SQR(W.d);
+
+            /* uFe23 */
+            proj_data_x[11][sx] += filter * SQR(W.d)*pow(W.P/W.d, -3.04);
+            proj_data_y[11][sy] += filter * SQR(W.d)*pow(W.P/W.d, -3.04);
+            proj_data_z[11][sz] += filter * SQR(W.d)*pow(W.P/W.d, -3.04);
+
+            /* uFe24 */
+            proj_data_x[12][sx] += filter * SQR(W.d)*pow(W.P/W.d, -1.23);
+            proj_data_y[12][sy] += filter * SQR(W.d)*pow(W.P/W.d, -1.23);
+            proj_data_z[12][sz] += filter * SQR(W.d)*pow(W.P/W.d, -1.23);
+
+            /* uFe25 */
+            proj_data_x[13][sx] += filter * SQR(W.d)*pow(W.P/W.d, 0.2);
+            proj_data_y[13][sy] += filter * SQR(W.d)*pow(W.P/W.d, 0.2);
+            proj_data_z[13][sz] += filter * SQR(W.d)*pow(W.P/W.d, 0.2);
+
+            /* uFe26 */
+            proj_data_x[14][sx] += filter * SQR(W.d)*pow(W.P/W.d, 2.41);
+            proj_data_y[14][sy] += filter * SQR(W.d)*pow(W.P/W.d, 2.41);
+            proj_data_z[14][sz] += filter * SQR(W.d)*pow(W.P/W.d, 2.41);
+
+            /* uAssorted (S15, Si14, O8) */
+            proj_data_x[15][sx] += filter * SQR(W.d)*pow(W.P/W.d, -1.46);
+            proj_data_y[15][sy] += filter * SQR(W.d)*pow(W.P/W.d, -1.46);
+            proj_data_z[15][sz] += filter * SQR(W.d)*pow(W.P/W.d, -1.46);
+         }
+      }
+   }
+
+
+#ifdef MPI_PARALLEL
+   ierr = MPI_Allreduce(&proj_data_x[0][0], &proj_data_global_x[0][0], n_bins*np_profiles,
+                        MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+   if(ierr)
+      ath_error("[calc_profiles]: MPI_Allreduce returned error in x dir %d\n", ierr);
+
+   ierr = MPI_Allreduce(&proj_data_y[0][0], &proj_data_global_y[0][0], n_bins*np_profiles,
+                        MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+   if(ierr)
+      ath_error("[calc_profiles]: MPI_Allreduce returned error in y dir %d\n", ierr);
+
+   ierr = MPI_Allreduce(&proj_data_z[0][0], &proj_data_global_z[0][0], n_bins*np_profiles,
+                        MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+   if(ierr)
+      ath_error("[calc_profiles]: MPI_Allreduce returned error in z dir %d\n", ierr);
+
+   for(profile_index=0; profile_index<np_profiles; profile_index++){
+      for(bin_index=0; bin_index<n_bins; bin_index++){
+         proj_data_x[profile_index][bin_index] = proj_data_global_x[profile_index][bin_index];
+         proj_data_y[profile_index][bin_index] = proj_data_global_y[profile_index][bin_index];
+         proj_data_z[profile_index][bin_index] = proj_data_global_z[profile_index][bin_index];
+      }
+   }
+#endif /* MPI_PARALLEL */
+
+
+   /* Divide through by 0th row of array (num) to get proper averages */
+   for(profile_index=1; profile_index<np_profiles; profile_index++){
+     for(bin_index=0; bin_index<n_bins; bin_index++){
+        if(proj_data_x[0][bin_index]!= 0.0){
+          proj_data_x[profile_index][bin_index] /= proj_data_x[0][bin_index];
+        }
+        if(proj_data_y[0][bin_index]!= 0.0){
+          proj_data_y[profile_index][bin_index] /= proj_data_y[0][bin_index];
+        }
+        if(proj_data_z[0][bin_index]!= 0.0){
+          proj_data_z[profile_index][bin_index] /= proj_data_z[0][bin_index];
+        }
+     }
+   }
+
+
+   return;
+
+}
+
+
 void dump_profile(DomainS *pD, OutputS *pOut)
 {
   FILE *pfile;
@@ -1687,6 +1961,360 @@ void dump_profile(DomainS *pD, OutputS *pOut)
   return;
 }
 
+
+void dump_proj_x(DomainS *pD, OutputS *pOut)
+{
+  FILE *pfile;
+  char *fname,*plev=NULL,*pdom=NULL;
+  char levstr[8],domstr[8];
+  Real x1,x2,x3;
+  char zone_fmt[20], fmt[80];
+  int col_cnt;
+  GridS *pGrid = pD->Grid;
+  char outfilename[80] = "proj_x1";
+
+  int c;
+
+  sprintf(fmt," %%12.8e"); /* Use a default format */
+
+  col_cnt = 1;
+
+  /* construct output filename. */
+  if((fname = ath_fname(NULL,
+                        outfilename,
+                        NULL,
+                        NULL,
+                        num_digit,
+                        pOut->num,
+                        NULL,
+                        "pro")) == NULL){
+    ath_error("[dump_profile]: Error constructing filename\n");
+  }
+
+  /* open output file */
+  if((pfile = fopen(fname,"w")) == NULL){
+    ath_error("[dump_profile]: Unable to open text file %s\n",fname);
+  }
+  free(fname);
+
+  /* Upper and Lower bounds on i,j,k for data dump */
+  sprintf(zone_fmt,"%%%dd", (int)(2+log10((double)(n_bins))));
+
+  /* Write out some header information */
+  if (pGrid->Nx[0] > 1) {
+    fprintf(pfile,"# N = %d\n", n_bins);
+  }
+  fprintf(pfile,"# X-PROJECTED PROFILE at Time= %g\n", pGrid->time);
+  fprintf(pfile,"# [z  m  h  rv] = [%f  %f  %f  %f]\n", z, m, h, rvir);
+
+  /* write out column headers.  Note column number is embedded in header */
+  fprintf(pfile,"# [%d]=i", col_cnt);
+  col_cnt++;
+  fprintf(pfile,"# [%d]=N_l.o.s", col_cnt);
+  col_cnt++;
+
+  if (pGrid->Nx[0] > 1) {
+    fprintf(pfile," [%d]=r", col_cnt);
+    col_cnt++;
+  }
+
+
+  /* print out headers for grid variables */
+  fprintf(pfile," [%d]=Luminosity", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=rho", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=P", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=T", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=K", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=Cs", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=Bremsstrahlung", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=rho^2", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=uFe23", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=uFe24", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=uFe25", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=uFe26", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=u(S15,Si14,O8)", col_cnt);
+  col_cnt++;
+
+  fprintf(pfile,"\n");
+
+  /* Write out data */
+
+  for(c=0; c<n_bins; c++){
+    fprintf(pfile, zone_fmt, c);
+    fprintf(pfile, fmt, proj_data_x[1][c]);
+
+    /* Dump all variables */
+    fprintf(pfile, fmt, proj_data_x[2][c]);
+    fprintf(pfile, fmt, proj_data_x[3][c]);
+    fprintf(pfile, fmt, proj_data_x[4][c]);
+    fprintf(pfile, fmt, proj_data_x[5][c]);
+    fprintf(pfile, fmt, proj_data_x[6][c]);
+    fprintf(pfile, fmt, proj_data_x[7][c]);
+    fprintf(pfile, fmt, proj_data_x[8][c]);
+    fprintf(pfile, fmt, proj_data_x[9][c]);
+    fprintf(pfile, fmt, proj_data_x[10][c]);
+    fprintf(pfile, fmt, proj_data_x[11][c]);
+    fprintf(pfile, fmt, proj_data_x[12][c]);
+    fprintf(pfile, fmt, proj_data_x[13][c]);
+    fprintf(pfile, fmt, proj_data_x[14][c]);
+    fprintf(pfile, fmt, proj_data_x[15][c]);
+
+    fprintf(pfile,"\n");
+  }
+
+  fclose(pfile);
+
+  return;
+}
+
+
+void dump_proj_y(DomainS *pD, OutputS *pOut)
+{
+  FILE *pfile;
+  char *fname,*plev=NULL,*pdom=NULL;
+  char levstr[8],domstr[8];
+  Real x1,x2,x3;
+  char zone_fmt[20], fmt[80];
+  int col_cnt;
+  GridS *pGrid = pD->Grid;
+  char outfilename[80] = "proj_x2";
+
+  int c;
+
+  sprintf(fmt," %%12.8e"); /* Use a default format */
+
+  col_cnt = 1;
+
+  /* construct output filename. */
+  if((fname = ath_fname(NULL,
+                        outfilename,
+                        NULL,
+                        NULL,
+                        num_digit,
+                        pOut->num,
+                        NULL,
+                        "pro")) == NULL){
+    ath_error("[dump_profile]: Error constructing filename\n");
+  }
+
+  /* open output file */
+  if((pfile = fopen(fname,"w")) == NULL){
+    ath_error("[dump_profile]: Unable to open text file %s\n",fname);
+  }
+  free(fname);
+
+  /* Upper and Lower bounds on i,j,k for data dump */
+  sprintf(zone_fmt,"%%%dd", (int)(2+log10((double)(n_bins))));
+
+  /* Write out some header information */
+  if (pGrid->Nx[0] > 1) {
+    fprintf(pfile,"# N = %d\n", n_bins);
+  }
+  fprintf(pfile,"# Y-PROJECTED PROFILE at Time= %g\n", pGrid->time);
+  fprintf(pfile,"# [z  m  h  rv] = [%f  %f  %f  %f]\n", z, m, h, rvir);
+
+  /* write out column headers.  Note column number is embedded in header */
+  fprintf(pfile,"# [%d]=i", col_cnt);
+  col_cnt++;
+  fprintf(pfile,"# [%d]=N_l.o.s.", col_cnt);
+  col_cnt++;
+
+  if (pGrid->Nx[0] > 1) {
+    fprintf(pfile," [%d]=r", col_cnt);
+    col_cnt++;
+  }
+
+
+  /* print out headers for grid variables */
+  fprintf(pfile," [%d]=Luminosity", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=rho", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=P", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=T", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=K", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=Cs", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=Bremsstrahlung", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=rho^2", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=uFe23", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=uFe24", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=uFe25", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=uFe26", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=u(S15,Si14,O8)", col_cnt);
+  col_cnt++;
+
+  fprintf(pfile,"\n");
+
+  /* Write out data */
+
+  for(c=0; c<n_bins; c++){
+    fprintf(pfile, zone_fmt, c);
+    fprintf(pfile, fmt, proj_data_y[1][c]);
+
+    /* Dump all variables */
+    fprintf(pfile, fmt, proj_data_y[2][c]);
+    fprintf(pfile, fmt, proj_data_y[3][c]);
+    fprintf(pfile, fmt, proj_data_y[4][c]);
+    fprintf(pfile, fmt, proj_data_y[5][c]);
+    fprintf(pfile, fmt, proj_data_y[6][c]);
+    fprintf(pfile, fmt, proj_data_y[7][c]);
+    fprintf(pfile, fmt, proj_data_y[8][c]);
+    fprintf(pfile, fmt, proj_data_y[9][c]);
+    fprintf(pfile, fmt, proj_data_y[10][c]);
+    fprintf(pfile, fmt, proj_data_y[11][c]);
+    fprintf(pfile, fmt, proj_data_y[12][c]);
+    fprintf(pfile, fmt, proj_data_y[13][c]);
+    fprintf(pfile, fmt, proj_data_y[14][c]);
+    fprintf(pfile, fmt, proj_data_y[15][c]);
+
+    fprintf(pfile,"\n");
+  }
+
+  fclose(pfile);
+
+  return;
+}
+
+
+void dump_proj_z(DomainS *pD, OutputS *pOut)
+{
+  FILE *pfile;
+  char *fname,*plev=NULL,*pdom=NULL;
+  char levstr[8],domstr[8];
+  Real x1,x2,x3;
+  char zone_fmt[20], fmt[80];
+  int col_cnt;
+  GridS *pGrid = pD->Grid;
+  char outfilename[80] = "proj_x3";
+
+  int c;
+
+  sprintf(fmt," %%12.8e"); /* Use a default format */
+
+  col_cnt = 1;
+
+  /* construct output filename. */
+  if((fname = ath_fname(NULL,
+                        outfilename,
+                        NULL,
+                        NULL,
+                        num_digit,
+                        pOut->num,
+                        NULL,
+                        "pro")) == NULL){
+    ath_error("[dump_profile]: Error constructing filename\n");
+  }
+
+  /* open output file */
+  if((pfile = fopen(fname,"w")) == NULL){
+    ath_error("[dump_profile]: Unable to open text file %s\n",fname);
+  }
+  free(fname);
+
+  /* Upper and Lower bounds on i,j,k for data dump */
+  sprintf(zone_fmt,"%%%dd", (int)(2+log10((double)(n_bins))));
+
+  /* Write out some header information */
+  if (pGrid->Nx[0] > 1) {
+    fprintf(pfile,"# N = %d\n", n_bins);
+  }
+  fprintf(pfile,"# Z-PROJECTED PROFILE at Time= %g\n", pGrid->time);
+  fprintf(pfile,"# [z  m  h  rv] = [%f  %f  %f  %f]\n", z, m, h, rvir);
+
+  /* write out column headers.  Note column number is embedded in header */
+  fprintf(pfile,"# [%d]=i", col_cnt);
+  col_cnt++;
+  fprintf(pfile,"# [%d]=N_l.o.s.", col_cnt);
+  col_cnt++;
+
+  if (pGrid->Nx[0] > 1) {
+    fprintf(pfile," [%d]=r", col_cnt);
+    col_cnt++;
+  }
+
+
+  /* print out headers for grid variables */
+  fprintf(pfile," [%d]=Luminosity", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=rho", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=P", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=T", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=K", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=Cs", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=Bremsstrahlung", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=rho^2", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=uFe23", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=uFe24", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=uFe25", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=uFe26", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=u(S15,Si14,O8)", col_cnt);
+  col_cnt++;
+
+  fprintf(pfile,"\n");
+
+  /* Write out data */
+
+  for(c=0; c<n_bins; c++){
+    fprintf(pfile, zone_fmt, c);
+    fprintf(pfile, fmt, proj_data_z[1][c]);
+
+    /* Dump all variables */
+    fprintf(pfile, fmt, proj_data_z[2][c]);
+    fprintf(pfile, fmt, proj_data_z[3][c]);
+    fprintf(pfile, fmt, proj_data_z[4][c]);
+    fprintf(pfile, fmt, proj_data_z[5][c]);
+    fprintf(pfile, fmt, proj_data_z[6][c]);
+    fprintf(pfile, fmt, proj_data_z[7][c]);
+    fprintf(pfile, fmt, proj_data_z[8][c]);
+    fprintf(pfile, fmt, proj_data_z[9][c]);
+    fprintf(pfile, fmt, proj_data_z[10][c]);
+    fprintf(pfile, fmt, proj_data_z[11][c]);
+    fprintf(pfile, fmt, proj_data_z[12][c]);
+    fprintf(pfile, fmt, proj_data_z[13][c]);
+    fprintf(pfile, fmt, proj_data_z[14][c]);
+    fprintf(pfile, fmt, proj_data_z[15][c]);
+
+    fprintf(pfile,"\n");
+  }
+
+  fclose(pfile);
+
+  return;
+}
+
 void Userwork_after_loop(MeshS *pM)
 {
   int nl, nd;
@@ -1694,12 +2322,16 @@ void Userwork_after_loop(MeshS *pM)
     for (nd=0; nd<=(pM->DomainsPerLevel[nl])-1; nd++) {
       if (pM->Domain[nl][nd].Grid != NULL) {
         calc_profiles(&(pM->Domain[nl][nd]), profile_data);
+	calc_projected(&(pM->Domain[nl][nd]));
 
         /* finally, write the data to disk, but only on the root process */
 #ifdef MPI_PARALLEL
         if (myID_Comm_world == 0){
 #endif /* MPI_PARALLEL */
           dump_profile(&(pM->Domain[nl][nd]), &profile_dump);
+          dump_proj_x(&(pM->Domain[nl][nd]), &profile_dump);
+          dump_proj_y(&(pM->Domain[nl][nd]), &profile_dump);
+          dump_proj_z(&(pM->Domain[nl][nd]), &profile_dump);
 #ifdef MPI_PARALLEL
         }
 #endif /* MPI_PARALLEL */
@@ -1709,9 +2341,16 @@ void Userwork_after_loop(MeshS *pM)
 
   /* free memory if necessary */
   if (profile_data != NULL) free_2d_array((void**) profile_data);
+  if (proj_data_x != NULL) free_2d_array((void**) proj_data_x);
+  if (proj_data_y != NULL) free_2d_array((void**) proj_data_y);
+  if (proj_data_z != NULL) free_2d_array((void**) proj_data_z);
 
 #ifdef MPI_PARALLEL
   if (profile_data_global != NULL) free_2d_array((void**) profile_data_global);
+
+  if (proj_data_global_x != NULL) free_2d_array((void**) proj_data_global_x);
+  if (proj_data_global_y != NULL) free_2d_array((void**) proj_data_global_y);
+  if (proj_data_global_z != NULL) free_2d_array((void**) proj_data_global_z);
 #endif /* MPI_PARALLEL */
 
   return;
