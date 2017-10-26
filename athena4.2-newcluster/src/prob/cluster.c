@@ -79,6 +79,7 @@ static Real nu_fun(const Real d, const Real T,
 static Real kT_keV(const Real P, const Real d);
 static Real L_23(const Real T);
 static Real cool(const Real d, const Real P, const Real dt);
+static Real line_L(const Real P, const Real d, const Real T1, const Real a, const Real b);
 static void integrate_cool(DomainS *pDomain, const Real dt_hydro);
 static void cool_step(GridS *pGrid, const Real dt);
 
@@ -108,14 +109,18 @@ static int n_bins;
 
    line luminosity assuming uniform metallicity:
      uFe23, uFe24, uFe25, uFe26, u(S15, Si14, O8),
-
+   
    MTI and magnetic fields:
      Convective Heat Flux, B^2, beta, Br, Alfven_Mach
+   
+   Testing new line luminosity function
+     Fe23, Fe24
+
 */
 #ifndef MHD
-const int n_profiles = 27;
+const int n_profiles = 29;
 #else
-const int n_profiles = 31;
+const int n_profiles = 33;
 #endif /* MHD */
 
 #ifdef MPI_PARALLEL
@@ -147,8 +152,11 @@ static Real **proj_data_z;
  *
  * line luminosity assuming uniform metallicity:
  *   uFe23, uFe24, uFe25, uFe26, u(S15, Si14, O8)
- * */
-const int np_profiles = 16;
+ *
+ * Testing new line luminosity function
+ *   Fe23, Fe24
+ */
+const int np_profiles = 18;
 
 #ifdef MPI_PARALLEL
 static Real **proj_data_global_x;
@@ -888,6 +896,14 @@ static void set_vars(Real time)
 /* ========================================================================== */
 /* cooling */
 
+/* Line luminosity function */
+static Real line_L(const Real P, const Real d, const Real T1, const Real a, const Real b)
+{
+   Real KT = kT_keV(P,d);
+   
+   return(pow((KT/T1),a) / (1.0 + pow((KT/T1),a+b)));
+}
+
 /* Given P and d in dimensionless units, return kT in keV. */
 /* -- dimensionless units are such that G = M0 = H0 = 1. */
 static Real kT_keV(const Real P, const Real d)
@@ -1499,6 +1515,14 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
             profile_data[30][s] += W.d*(SQR(W.V1)  + SQR(W.V2)  + SQR(W.V3))
                                       /(SQR(W.B1c) + SQR(W.B2c) + SQR(W.B3c));
 #endif /* MHD */
+            
+            /*Fe23 for new line function*/
+            profile_data[31][s] += SQR(W.d)*line_L(W.P, W.d, 1.0, 8.772,
+            3.024);
+
+            /*Fe24 for new line function*/
+            profile_data[32][s] += SQR(W.d)*line_L(W.P, W.d, 1.05, 7.553,
+            1.207);
          }
       }
    }
@@ -1743,6 +1767,22 @@ static void calc_projected(DomainS *pDomain)
             proj_data_x[15][sx] += filter * SQR(W.d)*pow(W.P/W.d, -1.46);
             proj_data_y[15][sy] += filter * SQR(W.d)*pow(W.P/W.d, -1.46);
             proj_data_z[15][sz] += filter * SQR(W.d)*pow(W.P/W.d, -1.46);
+            
+            /* Fe23 for new line function */
+            proj_data_x[16][sx] += filter * SQR(W.d)*line_L(W.P, W.d, 1.0,
+            8.772, 3.024);
+            proj_data_y[16][sy] += filter * SQR(W.d)*line_L(W.P, W.d, 1.0,
+            8.772, 3.024);
+            proj_data_z[16][sz] += filter * SQR(W.d)*line_L(W.P, W.d, 1.0,
+            8.772, 3.024);
+            
+            /* Fe24 for new line function */
+            proj_data_x[17][sx] += filter * SQR(W.d)*line_L(W.P, W.d, 1.05,
+            7.553, 1.207);
+            proj_data_y[17][sy] += filter * SQR(W.d)*line_L(W.P, W.d, 1.05,
+            7.553, 1.207);
+            proj_data_z[17][sz] += filter * SQR(W.d)*line_L(W.P, W.d, 1.05,
+            7.553, 1.207);
          }
       }
    }
@@ -1911,6 +1951,10 @@ void dump_profile(DomainS *pD, OutputS *pOut)
   fprintf(pfile," [%d]=Ma^2", col_cnt);
   col_cnt++;
 #endif /* MHD */
+  fprintf(pfile," [%d]=tstFe23", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=tstFe24", col_cnt);
+  col_cnt++;
 
   fprintf(pfile,"\n");
 
@@ -1952,7 +1996,9 @@ void dump_profile(DomainS *pD, OutputS *pOut)
     fprintf(pfile, fmt, profile_data[29][c]);
     fprintf(pfile, fmt, profile_data[30][c]);
 #endif /* MHD */
-
+    fprintf(pfile, fmt, profile_data[31][c]);
+    fprintf(pfile, fmt, profile_data[32][c]);
+    
     fprintf(pfile,"\n");
   }
 
@@ -2046,7 +2092,11 @@ void dump_proj_x(DomainS *pD, OutputS *pOut)
   col_cnt++;
   fprintf(pfile," [%d]=u(S15,Si14,O8)", col_cnt);
   col_cnt++;
-
+  fprintf(pfile," [%d]=tstFe23", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=tstFe24", col_cnt);
+  col_cnt++;
+  
   fprintf(pfile,"\n");
 
   /* Write out data */
@@ -2070,7 +2120,9 @@ void dump_proj_x(DomainS *pD, OutputS *pOut)
     fprintf(pfile, fmt, proj_data_x[13][c]);
     fprintf(pfile, fmt, proj_data_x[14][c]);
     fprintf(pfile, fmt, proj_data_x[15][c]);
-
+    fprintf(pfile, fmt, proj_data_x[16][c]);
+    fprintf(pfile, fmt, proj_data_x[17][c]);
+    
     fprintf(pfile,"\n");
   }
 
@@ -2164,6 +2216,10 @@ void dump_proj_y(DomainS *pD, OutputS *pOut)
   col_cnt++;
   fprintf(pfile," [%d]=u(S15,Si14,O8)", col_cnt);
   col_cnt++;
+  fprintf(pfile," [%d]=tstFe23", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=tstFe24", col_cnt);
+  col_cnt++;
 
   fprintf(pfile,"\n");
 
@@ -2188,6 +2244,8 @@ void dump_proj_y(DomainS *pD, OutputS *pOut)
     fprintf(pfile, fmt, proj_data_y[13][c]);
     fprintf(pfile, fmt, proj_data_y[14][c]);
     fprintf(pfile, fmt, proj_data_y[15][c]);
+    fprintf(pfile, fmt, proj_data_y[16][c]);
+    fprintf(pfile, fmt, proj_data_y[17][c]);
 
     fprintf(pfile,"\n");
   }
@@ -2282,6 +2340,10 @@ void dump_proj_z(DomainS *pD, OutputS *pOut)
   col_cnt++;
   fprintf(pfile," [%d]=u(S15,Si14,O8)", col_cnt);
   col_cnt++;
+  fprintf(pfile," [%d]=tstFe23", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=tstFe24", col_cnt);
+  col_cnt++;
 
   fprintf(pfile,"\n");
 
@@ -2306,6 +2368,8 @@ void dump_proj_z(DomainS *pD, OutputS *pOut)
     fprintf(pfile, fmt, proj_data_z[13][c]);
     fprintf(pfile, fmt, proj_data_z[14][c]);
     fprintf(pfile, fmt, proj_data_z[15][c]);
+    fprintf(pfile, fmt, proj_data_z[16][c]);
+    fprintf(pfile, fmt, proj_data_z[17][c]);
 
     fprintf(pfile,"\n");
   }
@@ -2551,6 +2615,8 @@ static Real hst_metal_r2(const GridS *pG, const int i, const int j, const int k)
 
 
 /* ========================================================================== */
+
+
 /*Vorticity output*/
 static Real omega(const GridS *pG, const int i, const int j, const int k)
 {
