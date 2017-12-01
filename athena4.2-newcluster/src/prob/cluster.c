@@ -76,6 +76,7 @@ static Real nu_fun(const Real d, const Real T,
                    const Real x1, const Real x2, const Real x3);
 #endif  /* VISCOSITY */
 
+static Real fraction(const Real T);
 static Real kT_keV(const Real P, const Real d);
 static Real L_23(const Real T);
 static Real cool(const Real d, const Real P, const Real dt);
@@ -155,8 +156,13 @@ static Real **proj_data_z;
  *
  * Testing new line luminosity function
  *   Fe21, Fe22, Fe23, Fe24, T_keV, B21, B22, B23, B24
+ *
+ * Neutral Column
+ *   NHI
+ *
+ * L_close
  */
-const int np_profiles = 25;
+const int np_profiles = 27;
 
 #ifdef MPI_PARALLEL
 static Real **proj_data_global_x;
@@ -894,7 +900,19 @@ static void set_vars(Real time)
 
 
 /* ========================================================================== */
-/* cooling */
+/* cooling, and some Lyman alpha stuff */
+
+/*Ratio ionized hydrogen to neutral hydrogen*/
+static Real fraction(const Real T)
+{
+   /*Power law fit to 10^6-8 K tail of H CIE data provided by Orly Gnat*/
+   /*Use kT_keV to convert to keV in real units, then convert back to kelvin in real units*/
+   /*Not very glamorous, but I never claimed to be*/
+   Real KT = kT_keV(T, 1.0);
+   Real temp = KT / (8.6173281497 * pow(10,-8.0));
+
+   return(1.03 * pow(10,-7.0) * pow(temp / (1.99526*pow(10,6.0)) , -1.22948));
+}
 
 /* Line luminosity function */
 static Real line_L(const Real T, const Real d, const Real turn, const Real a, const Real b)
@@ -1823,6 +1841,11 @@ static void calc_projected(DomainS *pDomain)
             proj_data_x[20][sx] += filter * kT_keV(W.P,W.d) * cool(W.d, W.P, 0.0);
             proj_data_y[20][sy] += filter * kT_keV(W.P,W.d) * cool(W.d, W.P, 0.0);
             proj_data_z[20][sz] += filter * kT_keV(W.P,W.d) * cool(W.d, W.P, 0.0);
+
+            /* Neutral Column */
+            proj_data_x[25][sx] += filter * fraction(W.P/W.d)*W.d*dx1;
+            proj_data_y[25][sy] += filter * fraction(W.P/W.d)*W.d*dx1;
+            proj_data_z[25][sz] += filter * fraction(W.P/W.d)*W.d*dx1;
          }
       }
    }
@@ -2219,6 +2242,10 @@ void dump_proj_x(DomainS *pD, OutputS *pOut)
   col_cnt++;
   fprintf(pfile," [%d]=Fe24_Bias", col_cnt);
   col_cnt++;
+  fprintf(pfile," [%d]=NH1", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=L_b", col_cnt);
+  col_cnt++;
   
   fprintf(pfile,"\n");
 
@@ -2252,6 +2279,8 @@ void dump_proj_x(DomainS *pD, OutputS *pOut)
     fprintf(pfile, fmt, proj_data_x[22][c]);
     fprintf(pfile, fmt, proj_data_x[23][c]);
     fprintf(pfile, fmt, proj_data_x[24][c]);
+    fprintf(pfile, fmt, proj_data_x[25][c]);
+    fprintf(pfile, fmt, proj_data_x[26][c]);
     
     fprintf(pfile,"\n");
   }
@@ -2364,6 +2393,10 @@ void dump_proj_y(DomainS *pD, OutputS *pOut)
   col_cnt++;
   fprintf(pfile," [%d]=Fe24_Bias", col_cnt);
   col_cnt++;
+  fprintf(pfile," [%d]=NH1", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=L_b", col_cnt);
+  col_cnt++;
 
   fprintf(pfile,"\n");
 
@@ -2397,6 +2430,8 @@ void dump_proj_y(DomainS *pD, OutputS *pOut)
     fprintf(pfile, fmt, proj_data_y[22][c]);
     fprintf(pfile, fmt, proj_data_y[23][c]);
     fprintf(pfile, fmt, proj_data_y[24][c]);
+    fprintf(pfile, fmt, proj_data_y[25][c]);
+    fprintf(pfile, fmt, proj_data_y[26][c]);
 
     fprintf(pfile,"\n");
   }
@@ -2509,6 +2544,10 @@ void dump_proj_z(DomainS *pD, OutputS *pOut)
   col_cnt++;
   fprintf(pfile," [%d]=Fe24_Bias", col_cnt);
   col_cnt++;
+  fprintf(pfile," [%d]=NH1", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=L_b", col_cnt);
+  col_cnt++;
 
   fprintf(pfile,"\n");
 
@@ -2542,6 +2581,8 @@ void dump_proj_z(DomainS *pD, OutputS *pOut)
     fprintf(pfile, fmt, proj_data_z[22][c]);
     fprintf(pfile, fmt, proj_data_z[23][c]);
     fprintf(pfile, fmt, proj_data_z[24][c]);
+    fprintf(pfile, fmt, proj_data_z[25][c]);
+    fprintf(pfile, fmt, proj_data_z[26][c]);
 
     fprintf(pfile,"\n");
   }
