@@ -1734,12 +1734,18 @@ static void calc_projected(DomainS *pDomain)
             /* 0,1,2 contains number of bins correspinding to a given s for x,y,z respectively */
 	    if(x1 == dx1/2.0){
 		proj_data_x[0][sx] += 1.0;
+		/*Emmissivity at impact parameter*/
+		proj_data_x[26][sx] += cool(W.d, W.P, 0.0);
 	    }
 	    if(x2 == dx1/2.0){
 		proj_data_y[0][sy] += 1.0;
+		/*Emmissivity at impact parameter*/
+		proj_data_y[26][sy] += cool(W.d, W.P, 0.0);
 	    }
 	    if(x3 == dx1/2.0){
 		proj_data_z[0][sz] += 1.0;
+		/*Emmissivity at impact parameter*/
+		proj_data_z[26][sz] += cool(W.d, W.P, 0.0);
 	    }
 
 	    /* Length of line of sight in bins */
@@ -1902,7 +1908,7 @@ static void calc_projected(DomainS *pDomain)
 	 Fe24 = proj_data_x[19][bin_index];
 	 temp = proj_data_x[6][bin_index]/proj_data_x[3][bin_index];
 	 rho = proj_data_x[4][bin_index]/proj_data_x[3][bin_index];
-	 Nlum = proj_data_x[3][bin_index]/cool(rho, temp*rho, 0.0);
+	 Nlum = proj_data_x[3][bin_index]/proj_data_x[26][bin_index];
 
          proj_data_x[21][bin_index] = (Fe21) / (Nlum*SQR(rho)*line_L(temp, rho, 0.75, 7.195, 7.195));
 	 proj_data_x[22][bin_index] = (Fe22) / (Nlum*SQR(rho)*line_L(temp, rho, 0.9, 6.513, 5.417));
@@ -1917,7 +1923,7 @@ static void calc_projected(DomainS *pDomain)
 	 Fe24 = proj_data_y[19][bin_index];
 	 temp = proj_data_y[6][bin_index]/proj_data_y[3][bin_index];
 	 rho = proj_data_y[4][bin_index]/proj_data_y[3][bin_index];
-	 Nlum = proj_data_y[3][bin_index]/cool(rho, temp*rho, 0.0);
+	 Nlum = proj_data_y[3][bin_index]/proj_data_y[26][bin_index];
 
          proj_data_y[21][bin_index] = (Fe21) / (Nlum*SQR(rho)*line_L(temp, rho, 0.75, 7.195, 7.195));
 	 proj_data_y[22][bin_index] = (Fe22) / (Nlum*SQR(rho)*line_L(temp, rho, 0.9, 6.513, 5.417));
@@ -1932,7 +1938,7 @@ static void calc_projected(DomainS *pDomain)
 	 Fe24 = proj_data_z[19][bin_index];
 	 temp = proj_data_z[6][bin_index]/proj_data_z[3][bin_index];
 	 rho = proj_data_z[4][bin_index]/proj_data_z[3][bin_index];
-	 Nlum = proj_data_z[3][bin_index]/cool(rho, temp*rho, 0.0);
+	 Nlum = proj_data_z[3][bin_index]/proj_data_z[26][bin_index];
 
          proj_data_z[21][bin_index] = (Fe21) / (Nlum*SQR(rho)*line_L(temp, rho, 0.75, 7.195, 7.195));
 	 proj_data_z[22][bin_index] = (Fe22) / (Nlum*SQR(rho)*line_L(temp, rho, 0.9, 6.513, 5.417));
