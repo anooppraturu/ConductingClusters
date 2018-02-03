@@ -76,10 +76,11 @@ static Real nu_fun(const Real d, const Real T,
                    const Real x1, const Real x2, const Real x3);
 #endif  /* VISCOSITY */
 
+static Real fraction(const Real T);
 static Real kT_keV(const Real P, const Real d);
 static Real L_23(const Real T);
 static Real cool(const Real d, const Real P, const Real dt);
-static Real line_L(const Real P, const Real d, const Real turn, const Real a, const Real b);
+static Real line_L(const Real T, const Real d, const Real turn, const Real a, const Real b);
 static void integrate_cool(DomainS *pDomain, const Real dt_hydro);
 static void cool_step(GridS *pGrid, const Real dt);
 
@@ -102,7 +103,7 @@ static int n_bins;
      Brem, rho^2,
 
    instability growth:
-     dT/T, drho/rho,
+     SQR(dT/T), SQR(drho/rho),
 
    line luminosity:
      Fe23, Fe24, Fe25, Fe26, (S15, Si14, O8),
@@ -114,13 +115,13 @@ static int n_bins;
      Convective Heat Flux, B^2, beta, Br, Alfven_Mach
    
    Testing new line luminosity function
-     Fe23, Fe24, T_keV, B23, B24
+     Fe21, Fe22, Fe23, Fe24, T_keV, B21, B22, B23, B24
 
 */
 #ifndef MHD
-const int n_profiles = 32;
-#else
 const int n_profiles = 36;
+#else
+const int n_profiles = 40;
 #endif /* MHD */
 
 #ifdef MPI_PARALLEL
@@ -154,9 +155,14 @@ static Real **proj_data_z;
  *   uFe23, uFe24, uFe25, uFe26, u(S15, Si14, O8)
  *
  * Testing new line luminosity function
- *   Fe23, Fe24, T_keV, B23, B24
+ *   Fe21, Fe22, Fe23, Fe24, T_keV, B21, B22, B23, B24
+ *
+ * Neutral Column
+ *   NHI
+ *
+ * L_close
  */
-const int np_profiles = 21;
+const int np_profiles = 27;
 
 #ifdef MPI_PARALLEL
 static Real **proj_data_global_x;
@@ -894,12 +900,24 @@ static void set_vars(Real time)
 
 
 /* ========================================================================== */
-/* cooling */
+/* cooling, and some Lyman alpha stuff */
+
+/*Ratio ionized hydrogen to neutral hydrogen*/
+static Real fraction(const Real T)
+{
+   /*Power law fit to 10^6-8 K tail of H CIE data provided by Orly Gnat*/
+   /*Use kT_keV to convert to keV in real units, then convert back to kelvin in real units*/
+   /*Not very glamorous, but I never claimed to be*/
+   Real KT = kT_keV(T, 1.0);
+   Real temp = KT / (8.6173281497 * pow(10,-8.0));
+
+   return(1.03 * pow(10,-7.0) * pow(temp / (1.99526*pow(10,6.0)) , -1.22948));
+}
 
 /* Line luminosity function */
-static Real line_L(const Real P, const Real d, const Real turn, const Real a, const Real b)
+static Real line_L(const Real T, const Real d, const Real turn, const Real a, const Real b)
 {
-   Real KT = kT_keV(P,d);
+   Real KT = kT_keV(T*d,d);
    Real T1 = turn*pow(b/a,1.0/(a+b));
    
    return(pow((KT/T1),a) / (1.0 + pow((KT/T1),a+b)));
@@ -1531,16 +1549,24 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
 
 /*PUTTING STUFF AFTER THE IFDEF MHD WILL GIVE A SEGFAULT FOR HYDRO NEED TO FIX BUT SICK AND LAZY AT THE MOMENT*/            
 
+            /*Fe21 for new line function*/
+            profile_data[31][s] += SQR(W.d)*line_L(W.P/W.d, W.d, 0.75, 7.195,
+            7.195);
+
+            /*Fe22 for new line function*/
+            profile_data[32][s] += SQR(W.d)*line_L(W.P/W.d, W.d, 0.9, 6.513,
+            5.417);
+
             /*Fe23 for new line function*/
-            profile_data[31][s] += SQR(W.d)*line_L(W.P, W.d, 1.1, 8.772,
+            profile_data[33][s] += SQR(W.d)*line_L(W.P/W.d, W.d, 1.1, 8.772,
             3.024);
 
             /*Fe24 for new line function*/
-            profile_data[32][s] += SQR(W.d)*line_L(W.P, W.d, 1.4, 7.553,
+            profile_data[34][s] += SQR(W.d)*line_L(W.P/W.d, W.d, 1.4, 7.553,
             1.207);
 
 	    /*Temperature in keV*/
-	    profile_data[33][s] += kT_keV(W.P, W.d);
+	    profile_data[35][s] += kT_keV(W.P, W.d);
          }
       }
    }
@@ -1585,11 +1611,11 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
 
             W = Cons_to_Prim(&(pGrid->U[k][j][i]));
 
-                 /* dT/T */
-                 profile_data[14][s] += (W.P/W.d - profile_data[4][s])/(profile_data[4][s]);
+                 /* SQR(dT/T) */
+                 profile_data[14][s] += SQR((W.P/W.d - profile_data[4][s])/(profile_data[4][s]));
 
-                 /* drho/rho */
-                 profile_data[15][s] += (W.d - profile_data[2][s])/(profile_data[2][s]);
+                 /* SQR(drho/rho) */
+                 profile_data[15][s] += SQR((W.d - profile_data[2][s])/(profile_data[2][s]));
 
                  /* rho dT dVr*/
                  profile_data[26][s] += W.d*(W.P/W.d - profile_data[4][s])*((W.V1*x1 + W.V2*x2 + W.V3*x3)/r - profile_data[7][s]);
@@ -1622,8 +1648,16 @@ static void calc_profiles(DomainS *pDomain, Real **profile_data)
 
    /* Last step is to construct the bias parameter for all the metal species */
    for(bin_index=0; bin_index<n_bins; bin_index++){
-      profile_data[34][bin_index] = profile_data[31][bin_index] / (SQR(profile_data[2][bin_index])*line_L(profile_data[3][bin_index],profile_data[2][bin_index],1.1,8.772,3.024));
-      profile_data[35][bin_index] = profile_data[32][bin_index] / (SQR(profile_data[2][bin_index])*line_L(profile_data[3][bin_index],profile_data[2][bin_index],1.4,7.553,1.207));
+      if(profile_data[2][bin_index] != 0.0){
+         /*Fe 21*/
+         profile_data[36][bin_index] = profile_data[31][bin_index] /(SQR(profile_data[2][bin_index])*line_L(profile_data[4][bin_index],profile_data[2][bin_index],0.75,7.195,7.195));
+         /*Fe 22*/
+         profile_data[37][bin_index] = profile_data[32][bin_index] / (SQR(profile_data[2][bin_index])*line_L(profile_data[4][bin_index],profile_data[2][bin_index],0.9,6.513,5.417));
+         /*Fe 23*/
+         profile_data[38][bin_index] = profile_data[33][bin_index] / (SQR(profile_data[2][bin_index])*line_L(profile_data[4][bin_index],profile_data[2][bin_index],1.1,8.772,3.024));
+         /*Fe 24*/
+         profile_data[39][bin_index] = profile_data[34][bin_index] / (SQR(profile_data[2][bin_index])*line_L(profile_data[4][bin_index],profile_data[2][bin_index],1.4,7.553,1.207));
+	 }
    }
 
 
@@ -1642,7 +1676,7 @@ static void calc_projected(DomainS *pDomain)
    double rx, ry, rz, filter;
 
    /*Define some variable to make calculatiing the bias parameter a little more clear*/
-   double Nlos, Fe23, Fe24, press, rho;
+   double Nlum, Fe21, Fe22, Fe23, Fe24, temp, rho;
 
    int prof_index;
 
@@ -1712,12 +1746,18 @@ static void calc_projected(DomainS *pDomain)
             /* 0,1,2 contains number of bins correspinding to a given s for x,y,z respectively */
 	    if(x1 == dx1/2.0){
 		proj_data_x[0][sx] += 1.0;
+		/*Emmissivity at impact parameter*/
+		proj_data_x[26][sx] += cool(W.d, W.P, 0.0);
 	    }
 	    if(x2 == dx1/2.0){
 		proj_data_y[0][sy] += 1.0;
+		/*Emmissivity at impact parameter*/
+		proj_data_y[26][sy] += cool(W.d, W.P, 0.0);
 	    }
 	    if(x3 == dx1/2.0){
 		proj_data_z[0][sz] += 1.0;
+		/*Emmissivity at impact parameter*/
+		proj_data_z[26][sz] += cool(W.d, W.P, 0.0);
 	    }
 
 	    /* Length of line of sight in bins */
@@ -1795,26 +1835,35 @@ static void calc_projected(DomainS *pDomain)
             proj_data_y[15][sy] += filter * SQR(W.d)*pow(W.P/W.d, -1.46);
             proj_data_z[15][sz] += filter * SQR(W.d)*pow(W.P/W.d, -1.46);
             
+            /* Fe21 for new line function */
+            proj_data_x[16][sx] += filter * SQR(W.d)*line_L(W.P/W.d, W.d, 0.75, 7.195, 7.195);
+            proj_data_y[16][sy] += filter * SQR(W.d)*line_L(W.P/W.d, W.d, 0.75, 7.195, 7.195);
+            proj_data_z[16][sz] += filter * SQR(W.d)*line_L(W.P/W.d, W.d, 0.75, 7.195, 7.195);
+
+            /* Fe22 for new line function */
+            proj_data_x[17][sx] += filter * SQR(W.d)*line_L(W.P/W.d, W.d, 0.9, 6.513, 5.417);
+            proj_data_y[17][sy] += filter * SQR(W.d)*line_L(W.P/W.d, W.d, 0.9, 6.513, 5.417);
+            proj_data_z[17][sz] += filter * SQR(W.d)*line_L(W.P/W.d, W.d, 0.9, 6.513, 5.417);
+
             /* Fe23 for new line function */
-            proj_data_x[16][sx] += filter * SQR(W.d)*line_L(W.P, W.d, 1.1,
-            8.772, 3.024);
-            proj_data_y[16][sy] += filter * SQR(W.d)*line_L(W.P, W.d, 1.1,
-            8.772, 3.024);
-            proj_data_z[16][sz] += filter * SQR(W.d)*line_L(W.P, W.d, 1.1,
-            8.772, 3.024);
+            proj_data_x[18][sx] += filter * SQR(W.d)*line_L(W.P/W.d, W.d, 1.1, 8.772, 3.024);
+            proj_data_y[18][sy] += filter * SQR(W.d)*line_L(W.P/W.d, W.d, 1.1, 8.772, 3.024);
+            proj_data_z[18][sz] += filter * SQR(W.d)*line_L(W.P/W.d, W.d, 1.1, 8.772, 3.024);
             
             /* Fe24 for new line function */
-            proj_data_x[17][sx] += filter * SQR(W.d)*line_L(W.P, W.d, 1.4,
-            7.553, 1.207);
-            proj_data_y[17][sy] += filter * SQR(W.d)*line_L(W.P, W.d, 1.4,
-            7.553, 1.207);
-            proj_data_z[17][sz] += filter * SQR(W.d)*line_L(W.P, W.d, 1.4,
-            7.553, 1.207);
+            proj_data_x[19][sx] += filter * SQR(W.d)*line_L(W.P/W.d, W.d, 1.4, 7.553, 1.207);
+            proj_data_y[19][sy] += filter * SQR(W.d)*line_L(W.P/W.d, W.d, 1.4, 7.553, 1.207);
+            proj_data_z[19][sz] += filter * SQR(W.d)*line_L(W.P/W.d, W.d, 1.4, 7.553, 1.207);
 
             /* temperature */
-            proj_data_x[18][sx] += filter * kT_keV(W.P,W.d) * cool(W.d, W.P, 0.0);
-            proj_data_y[18][sy] += filter * kT_keV(W.P,W.d) * cool(W.d, W.P, 0.0);
-            proj_data_z[18][sz] += filter * kT_keV(W.P,W.d) * cool(W.d, W.P, 0.0);
+            proj_data_x[20][sx] += filter * kT_keV(W.P,W.d) * cool(W.d, W.P, 0.0);
+            proj_data_y[20][sy] += filter * kT_keV(W.P,W.d) * cool(W.d, W.P, 0.0);
+            proj_data_z[20][sz] += filter * kT_keV(W.P,W.d) * cool(W.d, W.P, 0.0);
+
+            /* Neutral Column */
+            proj_data_x[25][sx] += filter * fraction(W.P/W.d)*W.d*dx1;
+            proj_data_y[25][sy] += filter * fraction(W.P/W.d)*W.d*dx1;
+            proj_data_z[25][sz] += filter * fraction(W.P/W.d)*W.d*dx1;
          }
       }
    }
@@ -1865,36 +1914,48 @@ static void calc_projected(DomainS *pDomain)
    for(bin_index=0; bin_index<n_bins; bin_index++){
       /*Make sure N_los is nonzero so we dont divide by zero*/
       if(proj_data_x[1][bin_index]!= 0.0){
-         Fe23 = proj_data_x[16][bin_index];
-	 Fe24 = proj_data_x[17][bin_index];
-	 Nlos = proj_data_x[1][bin_index];
-	 press = proj_data_x[5][bin_index];
-	 rho = proj_data_x[4][bin_index];
+         Fe21 = proj_data_x[16][bin_index];
+	 Fe22 = proj_data_x[17][bin_index];
+         Fe23 = proj_data_x[18][bin_index];
+	 Fe24 = proj_data_x[19][bin_index];
+	 temp = proj_data_x[6][bin_index]/proj_data_x[3][bin_index];
+	 rho = proj_data_x[4][bin_index]/proj_data_x[3][bin_index];
+	 Nlum = proj_data_x[3][bin_index]/proj_data_x[26][bin_index];
 
-         proj_data_x[19][bin_index] = (Fe23) / (Nlos*SQR(rho/Nlos)*line_L(press/Nlos, rho/Nlos, 1.1, 8.772, 3.024));
-	 proj_data_x[20][bin_index] = (Fe24) / (Nlos*SQR(rho/Nlos)*line_L(press/Nlos, rho/Nlos, 1.4, 7.553, 1.207));
+         proj_data_x[21][bin_index] = (Fe21) / (Nlum*SQR(rho)*line_L(temp, rho, 0.75, 7.195, 7.195));
+	 proj_data_x[22][bin_index] = (Fe22) / (Nlum*SQR(rho)*line_L(temp, rho, 0.9, 6.513, 5.417));
+         proj_data_x[23][bin_index] = (Fe23) / (Nlum*SQR(rho)*line_L(temp, rho, 1.1, 8.772, 3.024));
+	 proj_data_x[24][bin_index] = (Fe24) / (Nlum*SQR(rho)*line_L(temp, rho, 1.4, 7.553, 1.207));
       }
 
       if(proj_data_y[1][bin_index]!= 0.0){
-         Fe23 = proj_data_y[16][bin_index];
-	 Fe24 = proj_data_y[17][bin_index];
-	 Nlos = proj_data_y[1][bin_index];
-	 press = proj_data_y[5][bin_index];
-	 rho = proj_data_y[4][bin_index];
+         Fe21 = proj_data_y[16][bin_index];
+	 Fe22 = proj_data_y[17][bin_index];
+         Fe23 = proj_data_y[18][bin_index];
+	 Fe24 = proj_data_y[19][bin_index];
+	 temp = proj_data_y[6][bin_index]/proj_data_y[3][bin_index];
+	 rho = proj_data_y[4][bin_index]/proj_data_y[3][bin_index];
+	 Nlum = proj_data_y[3][bin_index]/proj_data_y[26][bin_index];
 
-         proj_data_y[19][bin_index] = (Fe23) / (Nlos*SQR(rho/Nlos)*line_L(press/Nlos, rho/Nlos, 1.1, 8.772, 3.024));
-	 proj_data_y[20][bin_index] = (Fe24) / (Nlos*SQR(rho/Nlos)*line_L(press/Nlos, rho/Nlos, 1.4, 7.553, 1.207));
+         proj_data_y[21][bin_index] = (Fe21) / (Nlum*SQR(rho)*line_L(temp, rho, 0.75, 7.195, 7.195));
+	 proj_data_y[22][bin_index] = (Fe22) / (Nlum*SQR(rho)*line_L(temp, rho, 0.9, 6.513, 5.417));
+         proj_data_y[23][bin_index] = (Fe23) / (Nlum*SQR(rho)*line_L(temp, rho, 1.1, 8.772, 3.024));
+	 proj_data_y[24][bin_index] = (Fe24) / (Nlum*SQR(rho)*line_L(temp, rho, 1.4, 7.553, 1.207));
       }
 
       if(proj_data_z[1][bin_index]!= 0.0){
-         Fe23 = proj_data_z[16][bin_index];
-	 Fe24 = proj_data_z[17][bin_index];
-	 Nlos = proj_data_z[1][bin_index];
-	 press = proj_data_z[5][bin_index];
-	 rho = proj_data_z[4][bin_index];
+         Fe21 = proj_data_z[16][bin_index];
+	 Fe22 = proj_data_z[17][bin_index];
+         Fe23 = proj_data_z[18][bin_index];
+	 Fe24 = proj_data_z[19][bin_index];
+	 temp = proj_data_z[6][bin_index]/proj_data_z[3][bin_index];
+	 rho = proj_data_z[4][bin_index]/proj_data_z[3][bin_index];
+	 Nlum = proj_data_z[3][bin_index]/proj_data_z[26][bin_index];
 
-         proj_data_z[19][bin_index] = (Fe23) / (Nlos*SQR(rho/Nlos)*line_L(press/Nlos, rho/Nlos, 1.1, 8.772, 3.024));
-	 proj_data_z[20][bin_index] = (Fe24) / (Nlos*SQR(rho/Nlos)*line_L(press/Nlos, rho/Nlos, 1.4, 7.553, 1.207));
+         proj_data_z[21][bin_index] = (Fe21) / (Nlum*SQR(rho)*line_L(temp, rho, 0.75, 7.195, 7.195));
+	 proj_data_z[22][bin_index] = (Fe22) / (Nlum*SQR(rho)*line_L(temp, rho, 0.9, 6.513, 5.417));
+         proj_data_z[23][bin_index] = (Fe23) / (Nlum*SQR(rho)*line_L(temp, rho, 1.1, 8.772, 3.024));
+	 proj_data_z[24][bin_index] = (Fe24) / (Nlum*SQR(rho)*line_L(temp, rho, 1.4, 7.553, 1.207));
       }
    }
 
@@ -2019,11 +2080,19 @@ void dump_profile(DomainS *pD, OutputS *pOut)
   fprintf(pfile," [%d]=Ma^2", col_cnt);
   col_cnt++;
 #endif /* MHD */
+  fprintf(pfile," [%d]=tstFe21", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=tstFe22", col_cnt);
+  col_cnt++;
   fprintf(pfile," [%d]=tstFe23", col_cnt);
   col_cnt++;
   fprintf(pfile," [%d]=tstFe24", col_cnt);
   col_cnt++;
   fprintf(pfile," [%d]=T_keV", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=Fe21_Bias", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=Fe22_Bias", col_cnt);
   col_cnt++;
   fprintf(pfile," [%d]=Fe23_Bias", col_cnt);
   col_cnt++;
@@ -2075,6 +2144,10 @@ void dump_profile(DomainS *pD, OutputS *pOut)
     fprintf(pfile, fmt, profile_data[33][c]);
     fprintf(pfile, fmt, profile_data[34][c]);
     fprintf(pfile, fmt, profile_data[35][c]);
+    fprintf(pfile, fmt, profile_data[36][c]);
+    fprintf(pfile, fmt, profile_data[37][c]);
+    fprintf(pfile, fmt, profile_data[38][c]);
+    fprintf(pfile, fmt, profile_data[39][c]);
     
     fprintf(pfile,"\n");
   }
@@ -2169,15 +2242,27 @@ void dump_proj_x(DomainS *pD, OutputS *pOut)
   col_cnt++;
   fprintf(pfile," [%d]=u(S15,Si14,O8)", col_cnt);
   col_cnt++;
+  fprintf(pfile," [%d]=tstFe21", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=tstFe22", col_cnt);
+  col_cnt++;
   fprintf(pfile," [%d]=tstFe23", col_cnt);
   col_cnt++;
   fprintf(pfile," [%d]=tstFe24", col_cnt);
   col_cnt++;
   fprintf(pfile," [%d]=T_keV", col_cnt);
   col_cnt++;
+  fprintf(pfile," [%d]=Fe21_Bias", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=Fe22_Bias", col_cnt);
+  col_cnt++;
   fprintf(pfile," [%d]=Fe23_Bias", col_cnt);
   col_cnt++;
   fprintf(pfile," [%d]=Fe24_Bias", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=NH1", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=L_b", col_cnt);
   col_cnt++;
   
   fprintf(pfile,"\n");
@@ -2208,6 +2293,12 @@ void dump_proj_x(DomainS *pD, OutputS *pOut)
     fprintf(pfile, fmt, proj_data_x[18][c]);
     fprintf(pfile, fmt, proj_data_x[19][c]);
     fprintf(pfile, fmt, proj_data_x[20][c]);
+    fprintf(pfile, fmt, proj_data_x[21][c]);
+    fprintf(pfile, fmt, proj_data_x[22][c]);
+    fprintf(pfile, fmt, proj_data_x[23][c]);
+    fprintf(pfile, fmt, proj_data_x[24][c]);
+    fprintf(pfile, fmt, proj_data_x[25][c]);
+    fprintf(pfile, fmt, proj_data_x[26][c]);
     
     fprintf(pfile,"\n");
   }
@@ -2302,15 +2393,27 @@ void dump_proj_y(DomainS *pD, OutputS *pOut)
   col_cnt++;
   fprintf(pfile," [%d]=u(S15,Si14,O8)", col_cnt);
   col_cnt++;
+  fprintf(pfile," [%d]=tstFe21", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=tstFe22", col_cnt);
+  col_cnt++;
   fprintf(pfile," [%d]=tstFe23", col_cnt);
   col_cnt++;
   fprintf(pfile," [%d]=tstFe24", col_cnt);
   col_cnt++;
   fprintf(pfile," [%d]=T_keV", col_cnt);
   col_cnt++;
+  fprintf(pfile," [%d]=Fe21_Bias", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=Fe22_Bias", col_cnt);
+  col_cnt++;
   fprintf(pfile," [%d]=Fe23_Bias", col_cnt);
   col_cnt++;
   fprintf(pfile," [%d]=Fe24_Bias", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=NH1", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=L_b", col_cnt);
   col_cnt++;
 
   fprintf(pfile,"\n");
@@ -2341,6 +2444,12 @@ void dump_proj_y(DomainS *pD, OutputS *pOut)
     fprintf(pfile, fmt, proj_data_y[18][c]);
     fprintf(pfile, fmt, proj_data_y[19][c]);
     fprintf(pfile, fmt, proj_data_y[20][c]);
+    fprintf(pfile, fmt, proj_data_y[21][c]);
+    fprintf(pfile, fmt, proj_data_y[22][c]);
+    fprintf(pfile, fmt, proj_data_y[23][c]);
+    fprintf(pfile, fmt, proj_data_y[24][c]);
+    fprintf(pfile, fmt, proj_data_y[25][c]);
+    fprintf(pfile, fmt, proj_data_y[26][c]);
 
     fprintf(pfile,"\n");
   }
@@ -2435,15 +2544,27 @@ void dump_proj_z(DomainS *pD, OutputS *pOut)
   col_cnt++;
   fprintf(pfile," [%d]=u(S15,Si14,O8)", col_cnt);
   col_cnt++;
+  fprintf(pfile," [%d]=tstFe21", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=tstFe22", col_cnt);
+  col_cnt++;
   fprintf(pfile," [%d]=tstFe23", col_cnt);
   col_cnt++;
   fprintf(pfile," [%d]=tstFe24", col_cnt);
   col_cnt++;
   fprintf(pfile," [%d]=T_keV", col_cnt);
   col_cnt++;
+  fprintf(pfile," [%d]=Fe21_Bias", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=Fe22_Bias", col_cnt);
+  col_cnt++;
   fprintf(pfile," [%d]=Fe23_Bias", col_cnt);
   col_cnt++;
   fprintf(pfile," [%d]=Fe24_Bias", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=NH1", col_cnt);
+  col_cnt++;
+  fprintf(pfile," [%d]=L_b", col_cnt);
   col_cnt++;
 
   fprintf(pfile,"\n");
@@ -2474,6 +2595,12 @@ void dump_proj_z(DomainS *pD, OutputS *pOut)
     fprintf(pfile, fmt, proj_data_z[18][c]);
     fprintf(pfile, fmt, proj_data_z[19][c]);
     fprintf(pfile, fmt, proj_data_z[20][c]);
+    fprintf(pfile, fmt, proj_data_z[21][c]);
+    fprintf(pfile, fmt, proj_data_z[22][c]);
+    fprintf(pfile, fmt, proj_data_z[23][c]);
+    fprintf(pfile, fmt, proj_data_z[24][c]);
+    fprintf(pfile, fmt, proj_data_z[25][c]);
+    fprintf(pfile, fmt, proj_data_z[26][c]);
 
     fprintf(pfile,"\n");
   }
