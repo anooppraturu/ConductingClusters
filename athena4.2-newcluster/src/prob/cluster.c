@@ -1246,6 +1246,8 @@ static void inner_bc(DomainS *pDomain)
   int i=0,j=0,k=0;
   int is,ie,js,je,ks,ke,iprob;
   Real x1,x2,x3, r;
+  /*Density enhancement and angle of filament*/
+  Real chi_fil, alpha_fil, rho_fil, cos_theta_fil;
 #ifndef ISOTHERMAL
   Real KE, T, d, ME;
 #endif  /* ISOTHERMAL */
@@ -1253,6 +1255,10 @@ static void inner_bc(DomainS *pDomain)
   is = pGrid->is; ie = pGrid->ie;
   js = pGrid->js; je = pGrid->je;
   ks = pGrid->ks; ke = pGrid->ke;
+
+  chi_fil = par_getd("problem", "chi_filament");
+  cos_theta_fil = par_getd("problem", "cos_fil");
+  alpha_fil = (1.0 - chi_fil + chi_fil*cos_theta_fil)/cos_theta_fil;
 
   for (k=ks; k<=ke; k++) {
     for (j=js; j<=je; j++) {
@@ -1268,7 +1274,13 @@ static void inner_bc(DomainS *pDomain)
 #endif  /* MHD */
 
         if (r >= 2.0*rvir) {
-          pGrid->U[k][j][i].d = rho_out;
+          if (abs(x3)/r > cos_theta_fil){
+             rho_fil = chi_fil*rho_out;
+          }
+          else{
+             rho_fil = alpha_fil*rho_out;
+          }
+          pGrid->U[k][j][i].d = rho_fil;
 
           /* seed a perturbation for the MTI */
 #ifdef THERMAL_CONDUCTION
@@ -1281,7 +1293,7 @@ static void inner_bc(DomainS *pDomain)
           pGrid->U[k][j][i].M3 = 0.0;
 
 #ifndef ISOTHERMAL
-          pGrid->U[k][j][i].E = (Tigm * rho_out)/Gamma_1;
+          pGrid->U[k][j][i].E = (Tigm * rho_fil)/Gamma_1;
           pGrid->U[k][j][i].E += ME;
 #endif  /* ISOTHERMAL */
         }
